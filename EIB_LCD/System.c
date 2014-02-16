@@ -202,6 +202,56 @@ uint16_t phys_addr;
 	eib_set_device_address(EIB_DEVICE_CHANNEL, phys_addr);
 }
 
+/*
+   	Determines LCD Module type from resistor coding.
+	Tries to detect a resistor between data line Dn and Dn+1.
+	No resistor -> Type 0
+	Resistor between Dn and Dn+1 -> Type = n+1
+	Only checks for the first resistor.
+
+	CAUTION:
+	Assumes the stack pointer and all used variables are in the internal SRAM!
+
+*/
+uint8_t check_lcd_type_code (void) {
+
+	uint8_t	tft_type = 0;
+	uint8_t n;
+	uint8_t d;
+
+	NutEnterCritical();
+
+	// disable external memory i/f
+	PORTG |= 0x03; //disable RDn, WRn
+	PORTG &= ~(1 << 3); // disable ALE
+	DDRG |= 0x07; // set Rdn, WRn, ALE to output
+
+	MCUCR &= ~(1 << SRE);
+
+	// search for resistor (~10k)
+	for (n = 0; n < 7; n++) {
+
+		DDRA = (1 << n);
+		PORTA = ~(1 << n);
+
+		// give time to settle
+		for (d = 0; d < 40; d++)
+			asm volatile ("nop");
+
+		if (!(PINA & (1<<(n+1)) )) {
+			tft_type = n+1;
+			break;
+		}
+	}
+
+	// enable external memory i/f
+	MCUCR |= (1 << SRE);
+
+	NutExitCritical();
+	return tft_type;
+
+}
+
 
 // return: 0=ok, 1=file error, 2=out of mem, 3 out of heap
 uint8_t download_file_from_sd_card (_LCD_FILE_NAMES_t *fname) {

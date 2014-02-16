@@ -15,20 +15,14 @@
 #ifndef TFT_IO_H_
 #define TFT_IO_H_
 
-#ifndef __BOOTLOADER__
 #include <io.h>
 #include <sys/timer.h>
 #include <sys/thread.h>
 #include "MemoryMap.h"
-#include "ssd1963_cmd.h"
-#else
-#include <inttypes.h>
-#include <util/delay.h>
-#define NutDelay(d)	_delay_ms(d)
-#include "../EIB_LCD/MemoryMap.h"
-#include "system.h"
-#define	BYTE2COLOR(red, green, blue) ( ((red) & 0xf8) << 8) | ( ((green) & 0xfc) << 3) | (((blue) & 0xf8) >> 3)
-#endif
+#include "ssd1963.h"
+
+//#define	BYTE2COLOR(red, green, blue) ( ((red) & 0xf8) << 8) | ( ((green) & 0xfc) << 3) | (((blue) & 0xf8) >> 3)
+
 
 #if DEVID == 0x32024001
 #define HX8347A		// this is the old LCD controller sold until b/o 2011
@@ -63,20 +57,6 @@
 #define SSD1289_Y_OFFSET_FACT	15
 #define SSD1289_X_OFFSET		350
 #define SSD1289_X_OFFSET_FACT	11
-// Touch offset values for 5.0" LCD
-// Measured x --> ly and Y_OFFSET
-// Measured y --> lx and X_OFFSET
-#define SSD1963_50_Y_OFFSET			190
-#define SSD1963_50_Y_OFFSET_FACT	7.5
-#define SSD1963_50_X_OFFSET			3900
-#define SSD1963_50_X_OFFSET_FACT	4.7
-// Touch offset values for new 4.3" LCD
-// Measured x --> ly and Y_OFFSET
-// Measured y --> lx and X_OFFSET
-#define SSD1963_43_Y_OFFSET			390		//340
-#define SSD1963_43_Y_OFFSET_FACT	11.8	//12.3
-#define SSD1963_43_X_OFFSET			250		//170
-#define SSD1963_43_X_OFFSET_FACT	7.6		//7.7
 
 #define LCD_POINTER	0x00
 #define LCD_DATA	0x01
@@ -91,7 +71,6 @@
 #define	TFT_BACKLIGT_CTRL_DDR	DDRB
 #define TFT_BACKLIGT_CTRL_BIT	7
 
-#ifndef __BOOTLOADER__
 // intensity of dimmed backlight
 extern volatile uint8_t backlight_dimming;
 extern volatile uint8_t backlight_active;
@@ -101,12 +80,7 @@ extern volatile uint8_t backlight_active;
 #define TFT_BACKLIGHT_ON	OCR2 = backlight_active;
 #define TFT_BACKLIGHT_OFF	OCR2 = 0x00;
 #define TFT_BACKLIGHT_DIMM	OCR2 = backlight_dimming;
-#else
-#define TFT_BACKLIGHT_INIT	TFT_BACKLIGT_CTRL_DDR = (1<<TFT_BACKLIGT_CTRL_BIT);
-#define TFT_BACKLIGHT_ON	TFT_BACKLIGT_CTRL_PORT |= (1<<TFT_BACKLIGT_CTRL_BIT);
-#define TFT_BACKLIGHT_OFF	TFT_BACKLIGT_CTRL_PORT &= ~(1<<TFT_BACKLIGT_CTRL_BIT);
-#define TFT_BACKLIGHT_DIMM	TFT_BACKLIGT_CTRL_PORT |= (1<<TFT_BACKLIGT_CTRL_BIT);
-#endif
+
 #define D_CLK_PORT		PORTD
 #define D_CLK_DDR		DDRD
 #define D_CLK_BIT		0
@@ -132,17 +106,6 @@ extern volatile uint8_t backlight_active;
 
 #define nop() \
    asm volatile ("nop")
-
-#define TFT_MAX_X	319
-#define TFT_MAX_Y	239
-
-#ifdef TFT_480_800_CTRL_SSD1963
-#define TFT_1963_MAX_X	799
-#define TFT_1963_MAX_Y	479
-#else
-#define TFT_1963_MAX_X	479
-#define TFT_1963_MAX_Y	271
-#endif //TFT_480_800_CTRL_SSD1963
 
 // Some RGB 565 color codes
 #define TFT_COLOR_WHITE		0xffff
@@ -196,12 +159,11 @@ int lx;
 int	ly;
 } t_touch_event;
 
-#ifndef __BOOTLOADER__
 extern volatile uint8_t controller_type; // 0=unknown, 1 = HX8347-A, 2=SSD1289, 3=ILI9325 2.4" 180� rotated
 extern volatile uint16_t controller_id; // R00 value
+extern volatile uint8_t lcd_type;		// Resistor coding used to distinguish between LCDs if controller type is same
 extern volatile uint8_t invert_touch_y; // invert X coordinate of touch position
 extern volatile uint8_t invert_touch_x; // invert Y coordinate of touch position
-#endif
 
 void tft_set_reset_active (void);
 void tft_set_reset_inactive (void);
@@ -242,12 +204,11 @@ unsigned int showzifustr(unsigned int,unsigned int,unsigned char*,unsigned int,u
 //void showzifustr2(unsigned int,unsigned int,unsigned char*,unsigned int,unsigned int);
 void inttostr(int,unsigned char*);
 
-#ifndef __BOOTLOADER__
 int printf_tft(uint16_t, uint16_t, const char* , ...);			// Regular
 int printf_tft_P(uint16_t, uint16_t, const char* , ...);		// From FLASH
 int printf_tft_absolute_P(unsigned int, unsigned int, uint16_t, uint16_t, const char *, ...);	// Abolute position
 int printf_tft_append(uint16_t, uint16_t, const char* , ...);	// Append to current position
-#endif
+
 void tft_clrscr (uint16_t);
 void tft_set_cursor (uint16_t, uint8_t);
 
@@ -271,14 +232,16 @@ void tft_put_flash_image (uint16_t,uint16_t,uint16_t,uint16_t, uint32_t);
  */
 void tft_fill_rect (uint16_t, uint16_t,uint16_t,uint16_t,uint16_t);
 
-#ifdef __BOOTLOADER__
-// check, if screen was touched. For Bootloader
-uint8_t check_touch_event (void);
-uint8_t touched_inside_bounds (uint16_t, uint16_t, uint16_t, uint16_t);
-#endif
+
+// Used to outsource driver
+
+/* This function reads a byte from the tft data register
+ */
+uint8_t tft_read_byte(void);
+
 // get max display dimensions for the TFT screen
-int get_max_x(void);
-int get_max_y(void);
+inline uint16_t get_max_x(void);
+inline uint16_t get_max_y(void);
 // set backlight to full intensity
 void set_backlight_on (void);
 

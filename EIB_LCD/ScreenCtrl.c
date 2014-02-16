@@ -244,7 +244,7 @@ uint16_t addr;
 
     printf_tft_P( TFT_COLOR_BLUE, TFT_COLOR_WHITE, PSTR("Nut/OS %s "), NutVersionString());
     printf_tft_P( TFT_COLOR_BLUE, TFT_COLOR_WHITE, PSTR("Firmware V%d.%d"), pgm_read_byte_far((char*)&bootlodrinfo.app_version +1), pgm_read_byte_far((char*)&bootlodrinfo.app_version));
-	printf_tft_P( TFT_COLOR_GREEN, TFT_COLOR_WHITE, PSTR("Build %s at %s"), __DATE__, __TIME__);
+	printf_tft_P( TFT_COLOR_ORANGE, TFT_COLOR_WHITE, PSTR("Build %s"), __TIMESTAMP__);
 
 	addr = eib_get_device_address(EIB_DEVICE_CHANNEL);
     printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("Phys. Addr %d.%d.%d"), (addr >> 4) & 0x0f, addr & 0x0f, (addr >> 8) & 0xff );
@@ -262,8 +262,8 @@ uint16_t addr;
 	else
     	printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("EIB offline"));
 
-	printf_tft_P (TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("TFT Ctrl = %d, R00=%4.4x"), controller_type, controller_id);
-
+	printf_tft_P (TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("TFT Controller= %d, R00=%4.4x"), controller_type, controller_id, lcd_type);
+	printf_tft_P (TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("R-Code %u,   Resolution %u x %u"), lcd_type, get_max_x()+1, get_max_y()+1);
 	draw_button (ERASE_BUTTON_XPOS, ERASE_BUTTON_YPOS, BUTTON_WIDTH, "Erase Flash");		// added by sh
 	draw_button (MONITOR_BUTTON_XPOS, MONITOR_BUTTON_YPOS, BUTTON_WIDTH, "Monitor");
 	draw_button (DOWNLOAD_BUTTON_XPOS, DOWNLOAD_BUTTON_YPOS, BUTTON_WIDTH, "Download");
@@ -785,8 +785,7 @@ int d;
 			xp -= 4;
 	}
 	// clear until e/o line
-	//tft_fill_rect (monitor_color, xp,monitor_y,get_max_x(),monitor_y+10);
-	tft_fill_rect (monitor_color, xp,monitor_y,TFT_MAX_X,monitor_y+10);
+	tft_fill_rect (monitor_color, xp,monitor_y,get_max_x(),monitor_y+10);
 
 	hwmon_goto_next_line();
 }
@@ -798,7 +797,7 @@ void hwmon_show_ir_event () {
 		return;
 
 	// clear until e/o line
-	tft_fill_rect (monitor_color, 0,monitor_y,TFT_MAX_X,monitor_y+10);
+	tft_fill_rect (monitor_color, 0,monitor_y,get_max_x(),monitor_y+10);
 //FIXME: find better way to clear this line
 	tft_set_cursor (1, monitor_y);
 	printf_tft_P (TFT_COLOR_BLACK,monitor_color,PSTR("RC5: A=%2.2d C=%2.2d           "), rc5_a, rc5_c);
@@ -809,12 +808,11 @@ void hwmon_show_ir_event () {
 void hwmon_show_ds1820_event (double t, int8_t t_off, uint8_t c, uint8_t crc, uint8_t ok) {
 
 char s[] = "+";
-
 	if (system_page_active != SYSTEM_PAGE_HARDWARE_MONITOR)
 		return;
 
 	// clear until e/o line
-	tft_fill_rect (monitor_color, 0,monitor_y,TFT_MAX_X,monitor_y+10);
+	tft_fill_rect (monitor_color, 0,monitor_y,get_max_x(),monitor_y+10);
 //FIXME: find better way to clear this line
 	tft_set_cursor (1, monitor_y);
 
@@ -822,6 +820,7 @@ char s[] = "+";
 		printf_tft_P (TFT_COLOR_BLACK,TFT_COLOR_ORANGE,PSTR("DS1820 (%s): no slave   "), channel_names[c] );
 	}
 	else if (!crc) {
+		//printf_tft_P (TFT_COLOR_BLACK,monitor_color,PSTR("DS1820 (%s): %6.2f (%+4.1f) "), channel_names[c], t, ((double)t_off)/10);
 		if (t_off < 0)
 			s[0] = '-';
 		printf_tft_P (TFT_COLOR_BLACK,monitor_color,PSTR("DS1820 (%s): %6.2f (%s%1u.%1u) "), channel_names[c], t, s, abs(t_off/10), abs(t_off%10) );
@@ -841,12 +840,11 @@ void hwmon_show_dht_event (double t, double h, double d, int8_t t_off, int8_t h_
 
 char st[] = "+";
 char sh[] = "+";
-
 	if (system_page_active != SYSTEM_PAGE_HARDWARE_MONITOR)
 	return;
 
 	// clear until e/o line
-	tft_fill_rect (monitor_color, 0,monitor_y,TFT_MAX_X,monitor_y+10);
+	tft_fill_rect (monitor_color, 0,monitor_y,get_max_x(),monitor_y+10);
 //FIXME: find better way to clear this line
 	tft_set_cursor (1, monitor_y);
 
@@ -861,6 +859,7 @@ char sh[] = "+";
 			st[0] = '-';
 		if (h_off < 0)
 			sh[0] = '-';
+		//printf_tft_P (TFT_COLOR_BLACK,monitor_color,PSTR("DHT%s (%s): T%5.1f(%+4.1f) H%5.1f(%+4.1f) D%5.1f"), dht_names[type], channel_names[c], t, ((double)t_off)/10, h, ((double)h_off)/10, d);
 		printf_tft_P (TFT_COLOR_BLACK,monitor_color,PSTR("DHT%s (%s): T%5.1f(%s%1u.%1u) H%5.1f(%s%1u.%1u) D%5.1f"), dht_names[type], channel_names[c], t, st, abs(t_off/10), abs(t_off%10), h, sh, abs(h_off/10), abs(h_off%10), d);
 	}
 	else {
@@ -877,7 +876,7 @@ void hwmon_show_button_event (uint8_t btn, uint8_t state) {
 		return;
 
 	// clear until e/o line
-	tft_fill_rect (monitor_color, 0,monitor_y,TFT_MAX_X,monitor_y+10);
+	tft_fill_rect (monitor_color, 0,monitor_y,get_max_x(),monitor_y+10);
 //FIXME: find better way to clear this line
 	tft_set_cursor (1, monitor_y);
 	printf_tft_P (TFT_COLOR_BLACK,monitor_color,PSTR("Btn: %d -> %d           "), btn, state);

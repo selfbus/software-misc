@@ -13,21 +13,18 @@
  *
  */
 #include "tft_io.h"
-#ifndef __BOOTLOADER__
 #include "NandFlash.h"
-#endif
 #include <stdio.h>
 #include <stdarg.h>
 #include <avr/pgmspace.h>
 
 int TP_X, TP_Y;
 t_touch_event touch_event;
-#ifndef __BOOTLOADER__
 volatile uint8_t backlight_dimming;
 volatile uint8_t backlight_active;
-#endif
 volatile uint8_t controller_type; // 0=unknown, 1 = HX8347-A, 2=SSD1289, 3=ILI9325 2.4" 180� rotated, 4=ssd1963
 volatile uint16_t controller_id;
+volatile uint8_t lcd_type;		 // Resistor coding used to distinguish between LCDs if controller type is same
 volatile uint8_t invert_touch_y; // invert X coordinate of touch position
 volatile uint8_t invert_touch_x; // invert Y coordinate of touch position
 volatile uint16_t screen_max_x; // max X coordinate of display
@@ -349,15 +346,344 @@ uint8_t main_com_read_data(uint8_t com1) {
 	return tft_read_byte();
 }
 
-/* sents the init sequence to the tft controller
+
+
+
+// ######################################
+void ili9325_controller_init(uint8_t lcd_type, uint8_t rotate, volatile uint16_t *lcd_res_x, volatile uint16_t *lcd_res_y) {
+	#define TS_VAL_ENTRY_MOD			0x1038
+	#define TS_INS_START_OSC			0x00 //data read at this instruction should be 0x0789 --> use for test connection
+	#define TS_INS_DRIV_OUT_CTRL		0x01
+	#define TS_INS_DRIV_WAV_CTRL		0x02
+	#define TS_INS_ENTRY_MOD			0x03
+	#define TS_INS_RESIZE_CTRL			0x04
+	#define TS_INS_DISP_CTRL1			0x07
+	#define TS_INS_DISP_CTRL2			0x08
+	#define TS_INS_DISP_CTRL3			0x09
+	#define TS_INS_DISP_CTRL4			0x0A
+	#define TS_INS_RGB_DISP_IF_CTRL1	0x0C
+	#define TS_INS_FRM_MARKER_POS		0x0D
+	#define TS_INS_RGB_DISP_IF_CTRL2	0x0F
+	#define TS_INS_POW_CTRL1			0x10
+	#define TS_INS_POW_CTRL2			0x11
+	#define TS_INS_POW_CTRL3			0x12
+	#define TS_INS_POW_CTRL4			0x13
+	#define TS_INS_GRAM_HOR_AD			0x20
+	#define TS_INS_GRAM_VER_AD			0x21
+	#define TS_INS_RW_GRAM				0x22
+	#define TS_INS_POW_CTRL7			0x29
+	#define TS_INS_FRM_RATE_COL_CTRL	0x2B
+	#define TS_INS_GAMMA_CTRL1			0x30
+	#define TS_INS_GAMMA_CTRL2			0x31
+	#define TS_INS_GAMMA_CTRL3			0x32
+	#define TS_INS_GAMMA_CTRL4			0x35
+	#define TS_INS_GAMMA_CTRL5			0x36
+	#define TS_INS_GAMMA_CTRL6			0x37
+	#define TS_INS_GAMMA_CTRL7			0x38
+	#define TS_INS_GAMMA_CTRL8			0x39
+	#define TS_INS_GAMMA_CTRL9			0x3C
+	#define TS_INS_GAMMA_CTRL10			0x3D
+	#define TS_INS_HOR_START_AD			0x50
+	#define TS_INS_HOR_END_AD			0x51
+	#define TS_INS_VER_START_AD			0x52
+	#define TS_INS_VER_END_AD			0x53
+	#define TS_INS_GATE_SCAN_CTRL1		0x60
+	#define TS_INS_GATE_SCAN_CTRL2		0x61
+	#define TS_INS_GATE_SCAN_CTRL3		0x6A
+	#define TS_INS_PART_IMG1_DISP_POS	0x80
+	#define TS_INS_PART_IMG1_START_AD	0x81
+	#define TS_INS_PART_IMG1_END_AD		0x82
+	#define TS_INS_PART_IMG2_DISP_POS	0x83
+	#define TS_INS_PART_IMG2_START_AD	0x84
+	#define TS_INS_PART_IMG2_END_AD		0x85
+	#define TS_INS_PANEL_IF_CTRL1		0x90
+	#define TS_INS_PANEL_IF_CTRL2		0x92
+	#define TS_INS_PANEL_IF_CTRL3		0x93
+	#define TS_INS_PANEL_IF_CTRL4		0x95
+	#define TS_INS_PANEL_IF_CTRL5		0x97
+	#define TS_INS_PANEL_IF_CTRL6		0x98
+
+	// Return used resolution
+	*lcd_res_x = 319;	// X
+	*lcd_res_y = 239;	// Y
+
+	main_W_com_data(0xE3, 0x3008);
+	main_W_com_data(0xE7, 0x0012);
+	main_W_com_data(0xEF, 0x1231);
+
+	main_W_com_data(TS_INS_START_OSC, 0x0001); //start oscillator
+	NutDelay(50);
+
+	main_W_com_data(TS_INS_DRIV_OUT_CTRL, 0x0000); //set SS, SM
+	main_W_com_data(TS_INS_DRIV_WAV_CTRL, 0x0700); //set 1 line inversion
+
+	main_W_com_data(TS_INS_ENTRY_MOD, TS_VAL_ENTRY_MOD); //set GRAM write direction, BGR=0
+
+	main_W_com_data(TS_INS_RESIZE_CTRL, 0x0000); //no resizing
+
+	main_W_com_data(TS_INS_DISP_CTRL2, 0x0202); //front & back porch periods = 2
+	main_W_com_data(TS_INS_DISP_CTRL3, 0x0000);
+	main_W_com_data(TS_INS_DISP_CTRL4, 0x0000);
+
+	main_W_com_data(TS_INS_RGB_DISP_IF_CTRL1, 0x0000); //select system interface
+
+	main_W_com_data(TS_INS_FRM_MARKER_POS, 0x0000);
+	main_W_com_data(TS_INS_RGB_DISP_IF_CTRL2, 0x0000);
+
+	main_W_com_data(TS_INS_POW_CTRL1, 0x0000);
+	main_W_com_data(TS_INS_POW_CTRL2, 0x0007);
+	main_W_com_data(TS_INS_POW_CTRL3, 0x0000);
+	main_W_com_data(TS_INS_POW_CTRL4, 0x0000);
+
+	NutDelay(200);
+
+	main_W_com_data(TS_INS_POW_CTRL1, 0x1690);
+	main_W_com_data(TS_INS_POW_CTRL2, 0x0227);
+
+	NutDelay(50);
+
+	main_W_com_data(TS_INS_POW_CTRL3, 0x001A);
+
+	NutDelay(50);
+
+	main_W_com_data(TS_INS_POW_CTRL4, 0x1800);
+	main_W_com_data(TS_INS_POW_CTRL7, 0x002A);
+
+	NutDelay(50);
+
+	main_W_com_data(TS_INS_GRAM_HOR_AD, 0x0000);
+	main_W_com_data(TS_INS_GRAM_VER_AD, 0x0000);
+
+	main_W_com_data(TS_INS_GAMMA_CTRL1, 0x0007);
+	main_W_com_data(TS_INS_GAMMA_CTRL2, 0x0605);
+	main_W_com_data(TS_INS_GAMMA_CTRL3, 0x0106);
+	main_W_com_data(TS_INS_GAMMA_CTRL4, 0x0206);
+	main_W_com_data(TS_INS_GAMMA_CTRL5, 0x0808);
+	main_W_com_data(TS_INS_GAMMA_CTRL6, 0x0007);
+	main_W_com_data(TS_INS_GAMMA_CTRL7, 0x0201);
+	main_W_com_data(TS_INS_GAMMA_CTRL8, 0x0007);
+	main_W_com_data(TS_INS_GAMMA_CTRL9, 0x0602);
+	main_W_com_data(TS_INS_GAMMA_CTRL10, 0x0808);
+
+	main_W_com_data(TS_INS_HOR_START_AD, 0x0000);
+	main_W_com_data(TS_INS_HOR_END_AD, 0x00EF);
+	main_W_com_data(TS_INS_VER_START_AD, 0x0000);
+	main_W_com_data(TS_INS_VER_END_AD, 0x013F);
+	main_W_com_data(TS_INS_GATE_SCAN_CTRL1, 0xA700);
+	main_W_com_data(TS_INS_GATE_SCAN_CTRL2, 0x0001);
+	main_W_com_data(TS_INS_GATE_SCAN_CTRL3, 0x0000);
+
+	main_W_com_data(TS_INS_PART_IMG1_DISP_POS, 0x0000);
+	main_W_com_data(TS_INS_PART_IMG1_START_AD, 0x0000);
+	main_W_com_data(TS_INS_PART_IMG1_END_AD, 0x0000);
+	main_W_com_data(TS_INS_PART_IMG2_DISP_POS, 0x0000);
+	main_W_com_data(TS_INS_PART_IMG2_START_AD, 0x0000);
+	main_W_com_data(TS_INS_PART_IMG2_END_AD, 0x0000);
+
+	main_W_com_data(TS_INS_PANEL_IF_CTRL1, 0x0010);
+	main_W_com_data(TS_INS_PANEL_IF_CTRL2, 0x0000);
+	main_W_com_data(TS_INS_PANEL_IF_CTRL3, 0x0003);
+	main_W_com_data(TS_INS_PANEL_IF_CTRL4, 0x0110);
+	main_W_com_data(TS_INS_PANEL_IF_CTRL5, 0x0000);
+	main_W_com_data(TS_INS_PANEL_IF_CTRL6, 0x0000);
+
+	main_W_com_data(TS_INS_DISP_CTRL1, 0x0133);
+}
+
+void hx8347_controller_init(uint8_t lcd_type, uint8_t rotate, volatile uint16_t *lcd_res_x, volatile uint16_t *lcd_res_y) {
+
+	// Return used resolution
+	*lcd_res_x = 319;	// X
+	*lcd_res_y = 239;	// Y
+
+	main_W_com_data(0x46, 0x00A4);
+	main_W_com_data(0x47, 0x0053);
+	main_W_com_data(0x48, 0x0000);
+	main_W_com_data(0x49, 0x0044);
+	main_W_com_data(0x4a, 0x0004);
+	main_W_com_data(0x4b, 0x0067);
+	main_W_com_data(0x4c, 0x0033);
+	main_W_com_data(0x4d, 0x0077);
+	main_W_com_data(0x4e, 0x0012);
+	main_W_com_data(0x4f, 0x004C);
+	main_W_com_data(0x50, 0x0046);
+	main_W_com_data(0x51, 0x0044);
+
+	//240x320 window setting
+	main_W_com_data(0x02, 0x0000); // Column address start2
+	main_W_com_data(0x03, 0x0000); // Column address start1
+	main_W_com_data(0x04, 0x0000); // Column address end2
+	main_W_com_data(0x05, 0x00ef); // Column address end1
+	main_W_com_data(0x06, 0x0000); // Row address start2
+	main_W_com_data(0x07, 0x0000); // Row address start1
+	main_W_com_data(0x08, 0x0001); // Row address end2
+	main_W_com_data(0x09, 0x003f); // Row address end1
+
+	// Display Setting
+	main_W_com_data(0x01, 0x0006); // IDMON=0, INVON=1, NORON=1, PTLON=0
+	main_W_com_data(0x16, 0x0068); // MY=0, MX=1, MV=1, ML=1, BGR=0, TEON=0   0048
+	main_W_com_data(0x23, 0x0095); // N_DC=1001 0101
+	main_W_com_data(0x24, 0x0095); // PI_DC=1001 0101
+	main_W_com_data(0x25, 0x00FF); // I_DC=1111 1111
+
+	main_W_com_data(0x27, 0x0002); // N_BP=0000 0010
+	main_W_com_data(0x28, 0x0002); // N_FP=0000 0010
+	main_W_com_data(0x29, 0x0002); // PI_BP=0000 0010
+	main_W_com_data(0x2a, 0x0002); // PI_FP=0000 0010
+	main_W_com_data(0x2C, 0x0002); // I_BP=0000 0010
+	main_W_com_data(0x2d, 0x0002); // I_FP=0000 0010
+
+	main_W_com_data(0x3a, 0x0001); // N_RTN=0000, N_NW=001    0001
+	main_W_com_data(0x3b, 0x0000); // P_RTN=0000, P_NW=001
+	main_W_com_data(0x3c, 0x00f0); // I_RTN=1111, I_NW=000
+	main_W_com_data(0x3d, 0x0000); // DIV=00
+	NutDelay(2);
+	main_W_com_data(0x35, 0x0038); // EQS=38h
+	main_W_com_data(0x36, 0x0078); // EQP=78h
+	main_W_com_data(0x3E, 0x0038); // SON=38h
+	main_W_com_data(0x40, 0x000F); // GDON=0Fh
+	main_W_com_data(0x41, 0x00F0); // GDOFF
+
+	// Power Supply Setting
+	main_W_com_data(0x19, 0x0049); // CADJ=0100, CUADJ=100, OSD_EN=1 ,60Hz
+	main_W_com_data(0x93, 0x000F); // RADJ=1111, 100%
+	NutDelay(2);
+	main_W_com_data(0x20, 0x0040); // BT=0100
+	main_W_com_data(0x1D, 0x0007); // VC1=111   0007
+	main_W_com_data(0x1E, 0x0000); // VC3=000
+	main_W_com_data(0x1F, 0x0004); // VRH=0011
+
+	//VCOM SETTING
+	main_W_com_data(0x44, 0x004D); // VCM=101 0000  4D
+	main_W_com_data(0x45, 0x000E); // VDV=1 0001   0011
+	NutDelay(2);
+	main_W_com_data(0x1C, 0x0004); // AP=100
+	NutDelay(3);
+
+	main_W_com_data(0x1B, 0x0018); // GASENB=0, PON=0, DK=1, XDK=0, VLCD_TRI=0, STB=0
+	NutDelay(2);
+	main_W_com_data(0x1B, 0x0010); // GASENB=0, PON=1, DK=0, XDK=0, VLCD_TRI=0, STB=0
+	NutDelay(2);
+	main_W_com_data(0x43, 0x0080); //set VCOMG=1
+	NutDelay(3);
+
+	// Display ON Setting
+	main_W_com_data(0x90, 0x007F); // SAP=0111 1111
+	main_W_com_data(0x26, 0x0004); //GON=0, DTE=0, D=01
+	NutDelay(2);
+	main_W_com_data(0x26, 0x0024); //GON=1, DTE=0, D=01
+	main_W_com_data(0x26, 0x002C); //GON=1, DTE=0, D=11
+	NutDelay(2);
+	main_W_com_data(0x26, 0x003C); //GON=1, DTE=1, D=11
+
+	// INTERNAL REGISTER SETTING
+	main_W_com_data(0x57, 0x0002); // TEST_Mode=1: into TEST mode
+	main_W_com_data(0x95, 0x0001); // SET DISPLAY CLOCK AND PUMPING CLOCK TO SYNCHRONIZE
+	main_W_com_data(0x57, 0x0000); // TEST_Mode=0: exit TEST mode
+}
+
+void ssd1289_controller_init(uint8_t lcd_type, uint8_t rotate, volatile uint16_t *lcd_res_x, volatile uint16_t *lcd_res_y) {
+
+	// Return used resolution
+	*lcd_res_x = 319;	// X
+	*lcd_res_y = 239;	// Y
+
+	main_W_com_data(0x0000, 0x0001);
+	NutDelay(2);
+	main_W_com_data(0x0003, 0xA8A4);
+	NutDelay(2);
+	main_W_com_data(0x000C, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x000D, 0x080C);
+	NutDelay(2);
+	main_W_com_data(0x000E, 0x2B00);
+	NutDelay(2);
+	main_W_com_data(0x001E, 0x00B0);
+	NutDelay(2);
+	main_W_com_data(0x0001, 0x293F);
+	NutDelay(2); //320*240  0x6B3F
+	main_W_com_data(0x0002, 0x0600);
+	NutDelay(2);
+	main_W_com_data(0x0010, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x0011, 0x6078);
+	NutDelay(2); //0x4030
+	main_W_com_data(0x0005, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x0006, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x0016, 0xEF1C);
+	NutDelay(2);
+	main_W_com_data(0x0017, 0x0003);
+	NutDelay(2);
+	main_W_com_data(0x0007, 0x0233);
+	NutDelay(2);
+	main_W_com_data(0x000B, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x000F, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x0041, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x0042, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x0048, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x0049, 0x013F);
+	NutDelay(2);
+	main_W_com_data(0x004A, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x004B, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x0044, 0xEF00);
+	NutDelay(2);
+	main_W_com_data(0x0045, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x0046, 0x013F);
+	NutDelay(2);
+	main_W_com_data(0x0030, 0x0707);
+	NutDelay(2);
+	main_W_com_data(0x0031, 0x0204);
+	NutDelay(2);
+	main_W_com_data(0x0032, 0x0204);
+	NutDelay(2);
+	main_W_com_data(0x0033, 0x0502);
+	NutDelay(2);
+	main_W_com_data(0x0034, 0x0507);
+	NutDelay(2);
+	main_W_com_data(0x0035, 0x0204);
+	NutDelay(2);
+	main_W_com_data(0x0036, 0x0204);
+	NutDelay(2);
+	main_W_com_data(0x0037, 0x0502);
+	NutDelay(2);
+	main_W_com_data(0x003A, 0x0302);
+	NutDelay(2);
+	main_W_com_data(0x003B, 0x0302);
+	NutDelay(2);
+	main_W_com_data(0x0023, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x0024, 0x0000);
+	NutDelay(2);
+	main_W_com_data(0x0025, 0x8000);
+	NutDelay(2);
+	main_W_com_data(0x004f, 0);
+	main_W_com_data(0x004e, 0);
+}
+// ######################################
+
+
+
+
+/* sends the init sequence to the tft controller
  */
 void tft_init_sequence(void) {
 
+	// Read resistor coding, if any
+	lcd_type = check_lcd_type_code ();
+
 	controller_type = CTRL_UNKNOWN;
 
-#ifndef __BOOTLOADER__
 	while (controller_type == CTRL_UNKNOWN) {
-#endif
 		tft_set_reset_inactive();
 		NutDelay(6);
 		tft_set_reset_active();
@@ -368,14 +694,10 @@ void tft_init_sequence(void) {
 		// autodetect sequence:
 		controller_id = main_W_com_read_data(0);
 		// get R00
-#ifndef __BOOTLOADER__
 #ifdef LCD_DEBUG
-		printf_P(PSTR("\nR00=%4.4x\n"), controller_id);
-#endif
+		printf_P(PSTR("\nR00= %4.4x  LCD-R-Code= %u"), controller_id, lcd_type);
 #endif
 		if ((controller_id & HX8347_MASK) == HX8347_R00) {
-
-#ifndef __BOOTLOADER__
 
 			// try  SSD1963
 			NutDelay(100);
@@ -389,628 +711,54 @@ void tft_init_sequence(void) {
 			b2 = tft_read_byte();
 			b3 = tft_read_byte();
 			b4 = tft_read_byte();
-
+/*
 #ifdef LCD_DEBUG
 			printf_P(PSTR("\nSSD1963: %2.2x %2.2x %2.2x %2.2x %2.2x\n"), b0, b1, b2, b3, b4);
 			printf_P(PSTR("SSD1963: %2.2x %2.2x %2.2x %2.2x %2.2x\n"), SSD1963_SSL_H, SSD1963_SSL_L, SSD1963_PROD, SSD1963_REV, SSD1963_EXIT);
 #endif
-
-			/*
-			 SSL[15:8] : Supplier ID of Solomon Systech Limited high byte, always 01h (POR = 00000001)
-			 SSL[7:0] : Supplier ID of Solomon Systech Limited low byte, always 57h (POR = 010101110)
-			 PROD[7:0] : Product ID, always 61h (POR = 01100001)
-			 REV[2:0] : Revision code, always 01h (POR = 001)
-			 Exit code, always FFh (POR = 11111111)
-			 */
+*/
 			if ((b0 == SSD1963_SSL_H) && (b1 == SSD1963_SSL_L)
 					&& (b2 == SSD1963_PROD) && (b3 == SSD1963_REV)
 					&& (b4 == SSD1963_EXIT)) {
 				controller_type = CTRL_SSD1963;
 			} else
-#endif // #ifndef __BOOTLOADER__
 				controller_type = CTRL_HX8347;
 		}
-#ifndef __BOOTLOADER__
 		else if ((controller_id & ILI9325_MASK) == ILI9325_R00) {
 			controller_type = CTRL_ILI9325;
 		}
-#endif
 		else if ((controller_id & SSD1289_MASK) == SSD1289_R00) {
 			controller_type = CTRL_SSD1289;
 		}
 
-#ifndef __BOOTLOADER__
-
 	}
 #ifdef LCD_DEBUG
-	printf_P(PSTR("ID=%d\n"), controller_type);
-#endif
+	printf_P(PSTR("\nController-ID= %d"), controller_type);
 #endif
 
 	if (controller_type == CTRL_HX8347) {
-		main_W_com_data(0x46, 0x00A4);
-		main_W_com_data(0x47, 0x0053);
-		main_W_com_data(0x48, 0x0000);
-		main_W_com_data(0x49, 0x0044);
-		main_W_com_data(0x4a, 0x0004);
-		main_W_com_data(0x4b, 0x0067);
-		main_W_com_data(0x4c, 0x0033);
-		main_W_com_data(0x4d, 0x0077);
-		main_W_com_data(0x4e, 0x0012);
-		main_W_com_data(0x4f, 0x004C);
-		main_W_com_data(0x50, 0x0046);
-		main_W_com_data(0x51, 0x0044);
-
-		//240x320 window setting
-		main_W_com_data(0x02, 0x0000); // Column address start2
-		main_W_com_data(0x03, 0x0000); // Column address start1
-		main_W_com_data(0x04, 0x0000); // Column address end2
-		main_W_com_data(0x05, 0x00ef); // Column address end1
-		main_W_com_data(0x06, 0x0000); // Row address start2
-		main_W_com_data(0x07, 0x0000); // Row address start1
-		main_W_com_data(0x08, 0x0001); // Row address end2
-		main_W_com_data(0x09, 0x003f); // Row address end1
-
-		// Display Setting
-		main_W_com_data(0x01, 0x0006); // IDMON=0, INVON=1, NORON=1, PTLON=0
-		main_W_com_data(0x16, 0x0068); // MY=0, MX=1, MV=1, ML=1, BGR=0, TEON=0   0048
-		main_W_com_data(0x23, 0x0095); // N_DC=1001 0101
-		main_W_com_data(0x24, 0x0095); // PI_DC=1001 0101
-		main_W_com_data(0x25, 0x00FF); // I_DC=1111 1111
-
-		main_W_com_data(0x27, 0x0002); // N_BP=0000 0010
-		main_W_com_data(0x28, 0x0002); // N_FP=0000 0010
-		main_W_com_data(0x29, 0x0002); // PI_BP=0000 0010
-		main_W_com_data(0x2a, 0x0002); // PI_FP=0000 0010
-		main_W_com_data(0x2C, 0x0002); // I_BP=0000 0010
-		main_W_com_data(0x2d, 0x0002); // I_FP=0000 0010
-
-		main_W_com_data(0x3a, 0x0001); // N_RTN=0000, N_NW=001    0001
-		main_W_com_data(0x3b, 0x0000); // P_RTN=0000, P_NW=001
-		main_W_com_data(0x3c, 0x00f0); // I_RTN=1111, I_NW=000
-		main_W_com_data(0x3d, 0x0000); // DIV=00
-		NutDelay(2);
-		main_W_com_data(0x35, 0x0038); // EQS=38h
-		main_W_com_data(0x36, 0x0078); // EQP=78h
-		main_W_com_data(0x3E, 0x0038); // SON=38h
-		main_W_com_data(0x40, 0x000F); // GDON=0Fh
-		main_W_com_data(0x41, 0x00F0); // GDOFF
-
-		// Power Supply Setting
-		main_W_com_data(0x19, 0x0049); // CADJ=0100, CUADJ=100, OSD_EN=1 ,60Hz
-		main_W_com_data(0x93, 0x000F); // RADJ=1111, 100%
-		NutDelay(2);
-		main_W_com_data(0x20, 0x0040); // BT=0100
-		main_W_com_data(0x1D, 0x0007); // VC1=111   0007
-		main_W_com_data(0x1E, 0x0000); // VC3=000
-		main_W_com_data(0x1F, 0x0004); // VRH=0011
-
-		//VCOM SETTING
-		main_W_com_data(0x44, 0x004D); // VCM=101 0000  4D
-		main_W_com_data(0x45, 0x000E); // VDV=1 0001   0011
-		NutDelay(2);
-		main_W_com_data(0x1C, 0x0004); // AP=100
-		NutDelay(3);
-
-		main_W_com_data(0x1B, 0x0018); // GASENB=0, PON=0, DK=1, XDK=0, VLCD_TRI=0, STB=0
-		NutDelay(2);
-		main_W_com_data(0x1B, 0x0010); // GASENB=0, PON=1, DK=0, XDK=0, VLCD_TRI=0, STB=0
-		NutDelay(2);
-		main_W_com_data(0x43, 0x0080); //set VCOMG=1
-		NutDelay(3);
-
-		// Display ON Setting
-		main_W_com_data(0x90, 0x007F); // SAP=0111 1111
-		main_W_com_data(0x26, 0x0004); //GON=0, DTE=0, D=01
-		NutDelay(2);
-		main_W_com_data(0x26, 0x0024); //GON=1, DTE=0, D=01
-		main_W_com_data(0x26, 0x002C); //GON=1, DTE=0, D=11
-		NutDelay(2);
-		main_W_com_data(0x26, 0x003C); //GON=1, DTE=1, D=11
-
-		// INTERNAL REGISTER SETTING
-		main_W_com_data(0x57, 0x0002); // TEST_Mode=1: into TEST mode
-		main_W_com_data(0x95, 0x0001); // SET DISPLAY CLOCK AND PUMPING CLOCK TO SYNCHRONIZE
-		main_W_com_data(0x57, 0x0000); // TEST_Mode=0: exit TEST mode
+		hx8347_controller_init(lcd_type, 0, &screen_max_x, &screen_max_y);
 	}
-#ifndef __BOOTLOADER__
+
 	else if (controller_type == CTRL_ILI9325) {
-
-#define TS_VAL_ENTRY_MOD			0x1038
-#define TS_INS_START_OSC			0x00 //data read at this instruction should be 0x0789 --> use for test connection
-#define TS_INS_DRIV_OUT_CTRL		0x01
-#define TS_INS_DRIV_WAV_CTRL		0x02
-#define TS_INS_ENTRY_MOD			0x03
-#define TS_INS_RESIZE_CTRL			0x04
-#define TS_INS_DISP_CTRL1			0x07
-#define TS_INS_DISP_CTRL2			0x08
-#define TS_INS_DISP_CTRL3			0x09
-#define TS_INS_DISP_CTRL4			0x0A
-#define TS_INS_RGB_DISP_IF_CTRL1	0x0C
-#define TS_INS_FRM_MARKER_POS		0x0D
-#define TS_INS_RGB_DISP_IF_CTRL2	0x0F
-#define TS_INS_POW_CTRL1			0x10
-#define TS_INS_POW_CTRL2			0x11
-#define TS_INS_POW_CTRL3			0x12
-#define TS_INS_POW_CTRL4			0x13
-#define TS_INS_GRAM_HOR_AD			0x20
-#define TS_INS_GRAM_VER_AD			0x21
-#define TS_INS_RW_GRAM				0x22
-#define TS_INS_POW_CTRL7			0x29
-#define TS_INS_FRM_RATE_COL_CTRL	0x2B
-#define TS_INS_GAMMA_CTRL1			0x30
-#define TS_INS_GAMMA_CTRL2			0x31
-#define TS_INS_GAMMA_CTRL3			0x32
-#define TS_INS_GAMMA_CTRL4			0x35
-#define TS_INS_GAMMA_CTRL5			0x36
-#define TS_INS_GAMMA_CTRL6			0x37
-#define TS_INS_GAMMA_CTRL7			0x38
-#define TS_INS_GAMMA_CTRL8			0x39
-#define TS_INS_GAMMA_CTRL9			0x3C
-#define TS_INS_GAMMA_CTRL10			0x3D
-#define TS_INS_HOR_START_AD			0x50
-#define TS_INS_HOR_END_AD			0x51
-#define TS_INS_VER_START_AD			0x52
-#define TS_INS_VER_END_AD			0x53
-#define TS_INS_GATE_SCAN_CTRL1		0x60
-#define TS_INS_GATE_SCAN_CTRL2		0x61
-#define TS_INS_GATE_SCAN_CTRL3		0x6A
-#define TS_INS_PART_IMG1_DISP_POS	0x80
-#define TS_INS_PART_IMG1_START_AD	0x81
-#define TS_INS_PART_IMG1_END_AD		0x82
-#define TS_INS_PART_IMG2_DISP_POS	0x83
-#define TS_INS_PART_IMG2_START_AD	0x84
-#define TS_INS_PART_IMG2_END_AD		0x85
-#define TS_INS_PANEL_IF_CTRL1		0x90
-#define TS_INS_PANEL_IF_CTRL2		0x92
-#define TS_INS_PANEL_IF_CTRL3		0x93
-#define TS_INS_PANEL_IF_CTRL4		0x95
-#define TS_INS_PANEL_IF_CTRL5		0x97
-#define TS_INS_PANEL_IF_CTRL6		0x98
-
-		main_W_com_data(0xE3, 0x3008);
-		main_W_com_data(0xE7, 0x0012);
-		main_W_com_data(0xEF, 0x1231);
-
-		main_W_com_data(TS_INS_START_OSC, 0x0001); //start oscillator
-		NutDelay(50);
-
-		main_W_com_data(TS_INS_DRIV_OUT_CTRL, 0x0000); //set SS, SM
-		main_W_com_data(TS_INS_DRIV_WAV_CTRL, 0x0700); //set 1 line inversion
-
-		main_W_com_data(TS_INS_ENTRY_MOD, TS_VAL_ENTRY_MOD); //set GRAM write direction, BGR=0
-
-		main_W_com_data(TS_INS_RESIZE_CTRL, 0x0000); //no resizing
-
-		main_W_com_data(TS_INS_DISP_CTRL2, 0x0202); //front & back porch periods = 2
-		main_W_com_data(TS_INS_DISP_CTRL3, 0x0000);
-		main_W_com_data(TS_INS_DISP_CTRL4, 0x0000);
-
-		main_W_com_data(TS_INS_RGB_DISP_IF_CTRL1, 0x0000); //select system interface
-
-		main_W_com_data(TS_INS_FRM_MARKER_POS, 0x0000);
-		main_W_com_data(TS_INS_RGB_DISP_IF_CTRL2, 0x0000);
-
-		main_W_com_data(TS_INS_POW_CTRL1, 0x0000);
-		main_W_com_data(TS_INS_POW_CTRL2, 0x0007);
-		main_W_com_data(TS_INS_POW_CTRL3, 0x0000);
-		main_W_com_data(TS_INS_POW_CTRL4, 0x0000);
-
-		NutDelay(200);
-
-		main_W_com_data(TS_INS_POW_CTRL1, 0x1690);
-		main_W_com_data(TS_INS_POW_CTRL2, 0x0227);
-
-		NutDelay(50);
-
-		main_W_com_data(TS_INS_POW_CTRL3, 0x001A);
-
-		NutDelay(50);
-
-		main_W_com_data(TS_INS_POW_CTRL4, 0x1800);
-		main_W_com_data(TS_INS_POW_CTRL7, 0x002A);
-
-		NutDelay(50);
-
-		main_W_com_data(TS_INS_GRAM_HOR_AD, 0x0000);
-		main_W_com_data(TS_INS_GRAM_VER_AD, 0x0000);
-
-		main_W_com_data(TS_INS_GAMMA_CTRL1, 0x0007);
-		main_W_com_data(TS_INS_GAMMA_CTRL2, 0x0605);
-		main_W_com_data(TS_INS_GAMMA_CTRL3, 0x0106);
-		main_W_com_data(TS_INS_GAMMA_CTRL4, 0x0206);
-		main_W_com_data(TS_INS_GAMMA_CTRL5, 0x0808);
-		main_W_com_data(TS_INS_GAMMA_CTRL6, 0x0007);
-		main_W_com_data(TS_INS_GAMMA_CTRL7, 0x0201);
-		main_W_com_data(TS_INS_GAMMA_CTRL8, 0x0007);
-		main_W_com_data(TS_INS_GAMMA_CTRL9, 0x0602);
-		main_W_com_data(TS_INS_GAMMA_CTRL10, 0x0808);
-
-		main_W_com_data(TS_INS_HOR_START_AD, 0x0000);
-		main_W_com_data(TS_INS_HOR_END_AD, 0x00EF);
-		main_W_com_data(TS_INS_VER_START_AD, 0x0000);
-		main_W_com_data(TS_INS_VER_END_AD, 0x013F);
-		main_W_com_data(TS_INS_GATE_SCAN_CTRL1, 0xA700);
-		main_W_com_data(TS_INS_GATE_SCAN_CTRL2, 0x0001);
-		main_W_com_data(TS_INS_GATE_SCAN_CTRL3, 0x0000);
-
-		main_W_com_data(TS_INS_PART_IMG1_DISP_POS, 0x0000);
-		main_W_com_data(TS_INS_PART_IMG1_START_AD, 0x0000);
-		main_W_com_data(TS_INS_PART_IMG1_END_AD, 0x0000);
-		main_W_com_data(TS_INS_PART_IMG2_DISP_POS, 0x0000);
-		main_W_com_data(TS_INS_PART_IMG2_START_AD, 0x0000);
-		main_W_com_data(TS_INS_PART_IMG2_END_AD, 0x0000);
-
-		main_W_com_data(TS_INS_PANEL_IF_CTRL1, 0x0010);
-		main_W_com_data(TS_INS_PANEL_IF_CTRL2, 0x0000);
-		main_W_com_data(TS_INS_PANEL_IF_CTRL3, 0x0003);
-		main_W_com_data(TS_INS_PANEL_IF_CTRL4, 0x0110);
-		main_W_com_data(TS_INS_PANEL_IF_CTRL5, 0x0000);
-		main_W_com_data(TS_INS_PANEL_IF_CTRL6, 0x0000);
-
-		main_W_com_data(TS_INS_DISP_CTRL1, 0x0133);
+		ili9325_controller_init(lcd_type, 0, &screen_max_x, &screen_max_y);
 	}
 
 	else if (controller_type == CTRL_SSD1963) {
-
-#ifdef TFT_480_800_CTRL_SSD1963
-
-#define		HDP		799
-#define		HT		928
-#define		HPS		46
-#define 	LPS		15
-#define 	HPW		48
-
-#define		VDP		479
-#define 	VT		525
-#define		VPS		16
-#define		FPS		8
-#define		VPW		16
-
-		// enable wait
-		XMCRA |= (1<<SRW00) | (1<<SRW01);// wait
-
-		tft_set_pointer(SSD1963_set_pll_mn);//PLL multiplier, set PLL clock to 120M
-		tft_write_byte(0x0023);//N=0x36 for 6.5M, 0x23 for 10M crystal
-		tft_write_byte(0x0002);
-		tft_write_byte(0x0004);
-		tft_set_pointer(SSD1963_set_pll);// PLL enable
-		tft_write_byte(0x0001);
-		NutDelay(1);
-		tft_set_pointer(SSD1963_set_pll);
-		tft_write_byte(0x0003);
-		NutDelay(5);
-		tft_set_pointer(SSD1963_soft_reset);// software reset
-		NutDelay(5);
-
-		// disable wait
-		XMCRA &= ~((1<<SRW00) | (1<<SRW01));// wait
-
-		tft_set_pointer(SSD1963_set_lshift_freq);//PLL setting for PCLK, depends on resolution
-		tft_write_byte(0x0003);
-		tft_write_byte(0x00ff);
-		tft_write_byte(0x00ff);
-
-		tft_set_pointer(SSD1963_set_lcd_mode);//LCD SPECIFICATION
-		tft_write_byte(0x0027);
-		tft_write_byte(0x0000);
-		tft_write_byte((HDP>>8)&0X00FF);//Set HDP
-		tft_write_byte(HDP&0X00FF);
-		tft_write_byte((VDP>>8)&0X00FF);//Set VDP
-		tft_write_byte(VDP&0X00FF);
-		tft_write_byte(0x0000);
-
-		tft_set_pointer(SSD1963_set_hori_period);//HSYNC
-		tft_write_byte((HT>>8)&0X00FF);//Set HT
-		tft_write_byte(HT&0X00FF);
-		tft_write_byte((HPS>>8)&0X00FF);//Set HPS
-		tft_write_byte(HPS&0X00FF);
-		tft_write_byte(HPW);//Set HPW
-		tft_write_byte((LPS>>8)&0X00FF);//Set HPS
-		tft_write_byte(LPS&0X00FF);
-		tft_write_byte(0x0000);
-
-		tft_set_pointer(SSD1963_set_vert_period);//VSYNC
-		tft_write_byte((VT>>8)&0X00FF);//Set VT
-		tft_write_byte(VT&0X00FF);
-		tft_write_byte((VPS>>8)&0X00FF);//Set VPS
-		tft_write_byte(VPS&0X00FF);
-		tft_write_byte(VPW);//Set VPW
-		tft_write_byte((FPS>>8)&0X00FF);//Set FPS
-		tft_write_byte(FPS&0X00FF);
-
-		tft_set_pointer(SSD1963_set_gpio_value);
-		tft_write_byte(0x000F);//GPIO[3:0] out 1
-
-		tft_set_pointer(SSD1963_set_gpio_conf);
-		tft_write_byte(0x0007);//GPIO3=input, GPIO[2:0]=output
-		tft_write_byte(0x0001);//GPIO0 normal
-
-		tft_set_pointer(SSD1963_set_address_mode);//rotation
-		tft_write_byte(0x0000);
-
-		tft_set_pointer(SSD1963_set_pixel_data_interface);//pixel data interface
-		tft_write_byte(0x0003);
-
-#ifdef LCD_DEBUG
-		tft_set_pointer(SSD1963_get_pixel_data_interface); //pixel data interface
-		printf_P(PSTR("\nint: %2.2x\n"), tft_read_byte());
-#endif
-		NutDelay(5);
-
-		tft_set_pointer(SSD1963_set_display_on); //display on
-
-		tft_set_pointer(SSD1963_set_dbc_conf);
-		tft_write_byte(0x000d);
+		ssd1963_controller_init(lcd_type, 1, &screen_max_x, &screen_max_y);
 	}
 
-#else
-
-// Select 4.3" LCD
-#ifdef TFT_272_480_CTRL_SSD1963_NEW
-
-// 480 x 272 pixel display	with SD Slot
-#define		HDP		479
-#define		HT		531
-#define		HPS		43
-#define 	LPS		8
-#define 	HPW		10
-
-#define		VDP		271
-#define 	VT		288
-#define		VPS		12
-#define		FPS		4
-#define		VPW		10
-
-		// enable wait
-		XMCRA |= (1 << SRW00) | (1 << SRW01); // wait
-
-		tft_set_pointer(SSD1963_set_pll_mn); //PLL multiplier, set PLL clock to 120M
-		tft_write_byte(0x002d); //N=0x36 for 6.5M, 0x23 for 10M crystal
-		tft_write_byte(0x0002);
-		tft_write_byte(0x0004);
-		tft_set_pointer(SSD1963_set_pll); // PLL enable
-		tft_write_byte(0x0001);
-		NutDelay(1);
-		tft_set_pointer(SSD1963_set_pll);
-		tft_write_byte(0x0003);
-		NutDelay(5);
-		tft_set_pointer(SSD1963_soft_reset); // software reset
-		NutDelay(5);
-
-		// disable wait
-		XMCRA &= ~((1 << SRW00) | (1 << SRW01)); // wait
-
-		tft_set_pointer(SSD1963_set_lshift_freq); //PLL setting for PCLK, depends on resolution
-		tft_write_byte(0x0000);
-		tft_write_byte(0x00ff);
-		tft_write_byte(0x00be);
-
-		tft_set_pointer(SSD1963_set_lcd_mode); //LCD SPECIFICATION
-		tft_write_byte(0x0020);
-		tft_write_byte(0x0000);
-		tft_write_byte((HDP >> 8) & 0X00FF); //Set HDP
-		tft_write_byte(HDP & 0X00FF);
-		tft_write_byte((VDP >> 8) & 0X00FF); //Set VDP
-		tft_write_byte(VDP & 0X00FF);
-		tft_write_byte(0x0000);
-		NutDelay(5);
-
-		tft_set_pointer(SSD1963_set_hori_period); //HSYNC
-		tft_write_byte((HT >> 8) & 0X00FF); //Set HT
-		tft_write_byte(HT & 0X00FF);
-		tft_write_byte((HPS >> 8) & 0X00FF); //Set HPS
-		tft_write_byte(HPS & 0X00FF);
-		tft_write_byte(HPW); //Set HPW
-		tft_write_byte((LPS >> 8) & 0X00FF); //Set HPS
-		tft_write_byte(LPS & 0X00FF);
-		tft_write_byte(0x0000);
-
-		tft_set_pointer(SSD1963_set_vert_period); //VSYNC
-		tft_write_byte((VT >> 8) & 0X00FF); //Set VT
-		tft_write_byte(VT & 0X00FF);
-		tft_write_byte((VPS >> 8) & 0X00FF); //Set VPS
-		tft_write_byte(VPS & 0X00FF);
-		tft_write_byte(VPW); //Set VPW
-		tft_write_byte((FPS >> 8) & 0X00FF); //Set FPS
-		tft_write_byte(FPS & 0X00FF);
-
-		tft_set_pointer(SSD1963_set_gpio_value);
-		tft_write_byte(0x0000); //GPIO[3:0] out 1
-
-		tft_set_pointer(SSD1963_set_gpio_conf);
-		tft_write_byte(0x0000); //GPIO3=input, GPIO[2:0]=output
-		tft_write_byte(0x0001); //GPIO0 normal
-
-		tft_set_pointer(SSD1963_set_address_mode); //rotation
-		tft_write_byte(0x0003);
-
-		tft_set_pointer(SSD1963_set_pixel_data_interface); //pixel data interface
-		tft_write_byte(0x0003);
-
-		NutDelay(5);
-
-		tft_set_pointer(SSD1963_set_display_on); //display on
-
-		tft_set_pointer(SSD1963_set_dbc_conf);
-		tft_write_byte(0x000d);
-	}
-#else
-
-// 480 x 272 pixel display	without SD Slot
-#define		HDP		479
-#define		HT		531
-#define		HPS		43
-#define 	LPS		8
-#define 	HPW		1
-
-#define		VDP		271
-#define 	VT		288
-#define		VPS		12
-#define		FPS		4
-#define		VPW		10
-
-		// enable wait
-		XMCRA |= (1 << SRW00) | (1 << SRW01); // wait
-
-		tft_set_pointer(SSD1963_set_pll_mn); //PLL multiplier, set PLL clock to 120M
-		tft_write_byte(0x0023); //N=0x36 for 6.5M, 0x23 for 10M crystal
-		tft_write_byte(0x0002);
-		tft_write_byte(0x0004);
-		tft_set_pointer(SSD1963_set_pll); // PLL enable
-		tft_write_byte(0x0001);
-		NutDelay(1);
-		tft_set_pointer(SSD1963_set_pll);
-		tft_write_byte(0x0003);
-		NutDelay(5);
-		tft_set_pointer(SSD1963_soft_reset); // software reset
-		NutDelay(5);
-
-		// disable wait
-		XMCRA &= ~((1 << SRW00) | (1 << SRW01)); // wait
-
-		tft_set_pointer(SSD1963_set_lshift_freq); //PLL setting for PCLK, depends on resolution
-		tft_write_byte(0x0003);
-		tft_write_byte(0x0033);
-		tft_write_byte(0x0032);
-
-		tft_set_pointer(SSD1963_set_lcd_mode); //LCD SPECIFICATION
-		tft_write_byte(0x0000);
-		tft_write_byte(0x0000);
-		tft_write_byte((HDP >> 8) & 0X00FF); //Set HDP
-		tft_write_byte(HDP & 0X00FF);
-		tft_write_byte((VDP >> 8) & 0X00FF); //Set VDP
-		tft_write_byte(VDP & 0X00FF);
-		tft_write_byte(0x002D);
-
-		tft_set_pointer(SSD1963_set_hori_period); //HSYNC
-		tft_write_byte((HT >> 8) & 0X00FF); //Set HT
-		tft_write_byte(HT & 0X00FF);
-		tft_write_byte((HPS >> 8) & 0X00FF); //Set HPS
-		tft_write_byte(HPS & 0X00FF);
-		tft_write_byte(HPW); //Set HPW
-		tft_write_byte((LPS >> 8) & 0X00FF); //Set HPS
-		tft_write_byte(LPS & 0X00FF);
-		tft_write_byte(0x0000);
-
-		tft_set_pointer(SSD1963_set_vert_period); //VSYNC
-		tft_write_byte((VT >> 8) & 0X00FF); //Set VT
-		tft_write_byte(VT & 0X00FF);
-		tft_write_byte((VPS >> 8) & 0X00FF); //Set VPS
-		tft_write_byte(VPS & 0X00FF);
-		tft_write_byte(VPW); //Set VPW
-		tft_write_byte((FPS >> 8) & 0X00FF); //Set FPS
-		tft_write_byte(FPS & 0X00FF);
-
-		tft_set_pointer(SSD1963_set_gpio_value);
-		tft_write_byte(0x000F); //GPIO[3:0] out 1
-
-		tft_set_pointer(SSD1963_set_gpio_conf);
-		tft_write_byte(0x0007); //GPIO3=input, GPIO[2:0]=output
-		tft_write_byte(0x0001); //GPIO0 normal
-
-		tft_set_pointer(SSD1963_set_address_mode); //rotation
-		tft_write_byte(0x0003);
-
-		tft_set_pointer(SSD1963_set_pixel_data_interface); //pixel data interface
-		tft_write_byte(0x0003);
-
-		NutDelay(5);
-
-		tft_set_pointer(SSD1963_set_display_on); //display on
-
-		tft_set_pointer(SSD1963_set_dbc_conf);
-		tft_write_byte(0x000d);
-	}
-#endif // TFT_272_480_CTRL_SSD1963_NEW
-#endif // TFT_480_800_CTRL_SSD1963
-#endif // __BOOTLOADER__
 	else if (controller_type == CTRL_SSD1289) {
-
-		main_W_com_data(0x0000, 0x0001);
-		NutDelay(2);
-		main_W_com_data(0x0003, 0xA8A4);
-		NutDelay(2);
-		main_W_com_data(0x000C, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x000D, 0x080C);
-		NutDelay(2);
-		main_W_com_data(0x000E, 0x2B00);
-		NutDelay(2);
-		main_W_com_data(0x001E, 0x00B0);
-		NutDelay(2);
-		main_W_com_data(0x0001, 0x293F);
-		NutDelay(2); //320*240  0x6B3F
-		main_W_com_data(0x0002, 0x0600);
-		NutDelay(2);
-		main_W_com_data(0x0010, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x0011, 0x6078);
-		NutDelay(2); //0x4030
-		main_W_com_data(0x0005, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x0006, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x0016, 0xEF1C);
-		NutDelay(2);
-		main_W_com_data(0x0017, 0x0003);
-		NutDelay(2);
-		main_W_com_data(0x0007, 0x0233);
-		NutDelay(2);
-		main_W_com_data(0x000B, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x000F, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x0041, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x0042, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x0048, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x0049, 0x013F);
-		NutDelay(2);
-		main_W_com_data(0x004A, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x004B, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x0044, 0xEF00);
-		NutDelay(2);
-		main_W_com_data(0x0045, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x0046, 0x013F);
-		NutDelay(2);
-		main_W_com_data(0x0030, 0x0707);
-		NutDelay(2);
-		main_W_com_data(0x0031, 0x0204);
-		NutDelay(2);
-		main_W_com_data(0x0032, 0x0204);
-		NutDelay(2);
-		main_W_com_data(0x0033, 0x0502);
-		NutDelay(2);
-		main_W_com_data(0x0034, 0x0507);
-		NutDelay(2);
-		main_W_com_data(0x0035, 0x0204);
-		NutDelay(2);
-		main_W_com_data(0x0036, 0x0204);
-		NutDelay(2);
-		main_W_com_data(0x0037, 0x0502);
-		NutDelay(2);
-		main_W_com_data(0x003A, 0x0302);
-		NutDelay(2);
-		main_W_com_data(0x003B, 0x0302);
-		NutDelay(2);
-		main_W_com_data(0x0023, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x0024, 0x0000);
-		NutDelay(2);
-		main_W_com_data(0x0025, 0x8000);
-		NutDelay(2);
-		main_W_com_data(0x004f, 0);
-		main_W_com_data(0x004e, 0);
+		ssd1289_controller_init(lcd_type, 0, &screen_max_x, &screen_max_y);
 	}
 
 	tft_set_pointer(0x22);
+
+#ifdef LCD_DEBUG
+	printf_P(PSTR("Resolution %u x %u\n====================\n"), get_max_x()+1, get_max_y()+1);
+#endif
 }
+
 
 void address_set(unsigned int x1, unsigned int y1, unsigned int x2,
 		unsigned int y2) {
@@ -1035,7 +783,6 @@ void address_set(unsigned int x1, unsigned int y1, unsigned int x2,
 		main_W_com_data(0x09, y2); // Row address end1
 		tft_set_pointer(0x22);
 	}
-#ifndef __BOOTLOADER__
 	else if (controller_type == CTRL_ILI9325) {
 
 #define TS_INS_GRAM_ADX				TS_INS_GRAM_VER_AD
@@ -1069,7 +816,6 @@ void address_set(unsigned int x1, unsigned int y1, unsigned int x2,
 		tft_set_pointer(SSD1963_write_memory_start);
 
 	}
-#endif
 	else if (controller_type == CTRL_SSD1289) {
 
 		main_W_com_data(0x44, (y2 << 8) + y1);
@@ -1087,20 +833,12 @@ void cld_write_color(uint8_t hh, uint8_t ll) {
 	tft_write_word((hh << 8) | ll);
 }
 
-int get_max_x(void) {
-
-	if (controller_type == CTRL_SSD1963)
-		return TFT_1963_MAX_X;
-	else
-		return TFT_MAX_X;
+inline uint16_t get_max_x(void) {
+	return screen_max_x;
 }
 
-int get_max_y(void) {
-
-	if (controller_type == CTRL_SSD1963)
-		return TFT_1963_MAX_Y;
-	else
-		return TFT_MAX_Y;
+inline uint16_t get_max_y(void) {
+	return screen_max_y;
 }
 
 // RGB888 -> RGB565 converter
@@ -1112,6 +850,9 @@ uint16_t tft_generate_color(uint8_t red, uint8_t green, uint8_t blue) {
 return ((r & 0x1f)<<11) | ((g & 0x3f)<<5) | (b & 0x1f); //R (5 bits) + G (6 bits) + B (5 bits)
 }
 
+/**
+ * Clears the total screen by filling it with the specified color
+ */
 void tft_pant(unsigned int color) {
 	int i;
 	int j;
@@ -1164,7 +905,6 @@ void tft_fill_rect(uint16_t color, uint16_t x1, uint16_t y1, uint16_t x2,
 
 void tft_put_flash_image(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2,
 		uint32_t flash_address) {
-#ifndef __BOOTLOADER__
 	volatile uint8_t b;
 	uint32_t pixel;
 	uint16_t bytes16;
@@ -1221,8 +961,6 @@ void tft_put_flash_image(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2,
 #ifdef LCD_DEBUG
 	printf ("done\n");
 #endif
-
-#endif
 }
 
 void inttostr(int dd, unsigned char *str) {
@@ -1256,14 +994,6 @@ static inline void showzifu(unsigned int x, unsigned int y, unsigned char value,
 
 	if (controller_type == CTRL_UNKNOWN)
 		return;
-
-#ifdef LCD_DEBUG
-	printf_P (PSTR("<%c> x=%d y=%d\n"), value, x, y);
-
-// draw box
-	tft_fill_rect ( TFT_COLOR_YELLOW, x,y,x+7,y+11);
-
-#endif
 
 	address_set(x, y, x + 7, y + 11);
 
@@ -1373,10 +1103,7 @@ void set_backlight_on() {
 
 }
 
-#ifndef __BOOTLOADER__
 THREAD(poll_touch , arg) {
-
-//unsigned char ss[6];
 
 	NutThreadSetPriority(100);
 
@@ -1431,57 +1158,8 @@ THREAD(poll_touch , arg) {
 
 				} else
 					lx = (TP_X - SSD1289_X_OFFSET) / SSD1289_X_OFFSET_FACT;
-			} else {
-#ifdef TFT_480_800_CTRL_SSD1963
-				// here we treat the 5" display using SSD1963
-
-				ly= (TP_X - SSD1963_50_Y_OFFSET) / SSD1963_50_Y_OFFSET_FACT;
-				if (!invert_touch_y)
-					ly = get_max_y() - ly;
-				if (ly < 0)
-					ly = 0;
-				if (ly > get_max_y())
-					ly = get_max_y();
-
-				lx= (SSD1963_50_X_OFFSET - TP_Y) / SSD1963_50_X_OFFSET_FACT;
-	#ifdef TFT_480_800_CTRL_SSD1963_INVERT_TOUCH_X
-				if (!invert_touch_x) {	// for the new 5.0" modules sold since b/o 2013
-	#else
-				if (invert_touch_x) { // for the 5.0" modules sold until b/o 2013
-	#endif //TFT_480_800_CTRL_SSD1963_INVERT_TOUCH_X
-					lx= get_max_x() - lx;
-				}
-				if (lx < 0)
-					lx = 0;
-#else
-				// here we treat the 4.3" display using SSD1963
-
-	#ifdef TFT_272_480_CTRL_SSD1963_NEW
-				ly = (TP_X - SSD1963_43_Y_OFFSET) / SSD1963_43_Y_OFFSET_FACT;	// for the new 4.3" modules with SD slot
-	#else
-				ly = (TP_Y - SSD1963_43_Y_OFFSET) / SSD1963_43_Y_OFFSET_FACT;	// for the 4.3" modules without SD slot
-	#endif
-				if (invert_touch_y)
-					ly = get_max_y() - ly;
-				if (ly < 0)
-					ly = 0;
-				if (ly > get_max_y())
-					ly = get_max_y();
-	#ifdef TFT_272_480_CTRL_SSD1963_NEW
-				lx = (TP_Y - SSD1963_43_X_OFFSET) / SSD1963_43_X_OFFSET_FACT;	// for the new 4.3" modules with SD slot
-	#else
-				lx = (TP_X - SSD1963_43_X_OFFSET) / SSD1963_43_X_OFFSET_FACT;	// for the 4.3" modules without SD slot
-	#endif
-				if (invert_touch_x) {
-					lx = get_max_x() - lx;
-				}
-				if (lx < 0)
-					lx = 0;
-				if (lx > get_max_x())
-					lx = get_max_x();
-
-#endif // TFT_480_800_CTRL_SSD1963
-			}
+			} else
+				ssd1963_touch_pressed();	// Uses global variable, FIX THIS!!!!
 
 			if (lx > get_max_x())
 				lx = get_max_x();
@@ -1543,40 +1221,38 @@ THREAD(poll_touch , arg) {
 
 }
 
-#else
+//
+//uint8_t check_touch_event () {
+//
+	//if (TOUCH_IRQ==0) {
+		//// the touch screen is touched
+//
+		//// get new position
+		//AD7843();
+//
+		//ly= (TP_Y-200) / 15;
+		//if (ly < 0) ly = 0;
+		//if (ly > get_max_y()) ly = get_max_y();
+//
+		//lx= (TP_X-350) / 11;
+		//if (lx > get_max_x()) lx = get_max_x();
+//
+		//return 1;
+	//}
+//
+	//return 0;
+//}
+//
+//uint8_t touched_inside_bounds (uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2) {
+//
+	//if (lx < x1) return 0;
+	//if (lx > x2) return 0;
+	//if (ly < y1) return 0;
+	//if (ly > y2) return 0;
+//
+	//return 1;
+//}
 
-uint8_t check_touch_event () {
-
-	if (TOUCH_IRQ==0) {
-		// the touch screen is touched
-
-		// get new position
-		AD7843();
-
-		ly= (TP_Y-200) / 15;
-		if (ly < 0) ly = 0;
-		if (ly > get_max_y()) ly = get_max_y();
-
-		lx= (TP_X-350) / 11;
-		if (lx > get_max_x()) lx = get_max_x();
-
-		return 1;
-	}
-
-	return 0;
-}
-
-uint8_t touched_inside_bounds (uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2) {
-
-	if (lx < x1) return 0;
-	if (lx > x2) return 0;
-	if (ly < y1) return 0;
-	if (ly > y2) return 0;
-
-	return 1;
-}
-
-#endif
 
 // refresh backlight setting as dimming values are changed
 void refresh_backlight(void) {
@@ -1597,10 +1273,8 @@ void touch_init(void) {
 	char_x = START_CHAR_X_POS;
 	char_y = START_CHAR_Y_POS;
 
-#ifndef __BOOTLOADER__
 	// create touch poll process
 	NutThreadCreate("TOUCH", poll_touch, 0, NUT_THREAD_POLL_TOUCH_STACK);
-#endif
 }
 
 //init the tft control i/f
@@ -1613,14 +1287,6 @@ void tft_init(void) {
 	// init touch controller ports
 	TOUCH_PORT_INIT
 	spistar(); //start spi
-
-#ifdef __BOOTLOADER__
-	// enable external memory-if
-	// enable memory i/f
-	MCUCR |= (1 << SRE);
-	XMCRA &= 0xff ^ (1<<SRW11);// no wait
-	MCUCR &= 0xff ^ (1<<SRW10);// no wait
-#endif
 
 	tft_init_sequence();
 
@@ -1645,7 +1311,11 @@ void tft_clrscr(uint16_t ccolor) {
 	tft_pant(ccolor);
 }
 
-#ifndef __BOOTLOADER__
+
+
+
+
+
 
 #define BUFF_SIZE	60
 unsigned char buffer[BUFF_SIZE];
@@ -1794,4 +1464,3 @@ int printf_tft_append(uint16_t ccolor, uint16_t bcolor, const char *format, ...)
 
 	return c;
 }
-#endif

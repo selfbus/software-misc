@@ -68,6 +68,8 @@ uint32_t baud = 115200;
 	UBRR0L = 0x08;
     NutSleep(200);
     printf_P(PSTR("\n\nNut/OS %s "), NutVersionString());
+	printf_P(PSTR("\nFirmware V%d.%d"), pgm_read_byte_far((char*)&bootlodrinfo.app_version +1), pgm_read_byte_far((char*)&bootlodrinfo.app_version));
+	printf_P(PSTR("\nBuild %s with GCC %s"), __TIMESTAMP__, __VERSION__);
 #endif
 	/* set external memory i/f timing */
 	XMCRB |= (1<<XMBK); // enable bus keepers
@@ -78,13 +80,13 @@ uint32_t baud = 115200;
 	/* init tft controller */
 	tft_init();
 #ifdef LCD_DEBUG
-    printf_P(PSTR("\nTFT initialized.\n"));
+    printf_P(PSTR("TFT initialized.\n"));
 #endif
 
 	/* from now onwards we can output status messages to the TFT. It helps for debugging in case the start procedure crashes. */
-    printf_tft( TFT_COLOR_BLACK, TFT_COLOR_WHITE, "Nut/OS %s ", NutVersionString());
+    printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("Nut/OS %s "), NutVersionString());
 	/* setup the external Flash memory device */
-	printf_tft( TFT_COLOR_GREEN, TFT_COLOR_WHITE, "Init NAND Flash");
+	printf_tft_P( TFT_COLOR_GREEN, TFT_COLOR_WHITE, PSTR("Init NAND Flash"));
 	init_nand_flash();
 	/* read project information from external NAND Flash and configure the system accordingly. */
 	init_system_from_flash ();
