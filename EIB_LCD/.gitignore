@@ -1,0 +1,9 @@
+*.atsln
+*.atsuo
+*.cproj
+*.7z
+*.lst
+*.o
+*.map
+*.bin
+*.elf

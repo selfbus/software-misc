@@ -189,6 +189,8 @@ uint8_t download_file_from_sd_card (_LCD_FILE_NAMES_t*);
 void init_physical_address_from_Flash (void);
 // invalidates contents of the Flash
 void set_flash_content_invalid(void);
+// check for connected TFT module type
+uint8_t check_lcd_type_code (void);
 
 
 

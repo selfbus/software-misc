@@ -89,14 +89,14 @@ _O_DS1820_t*	p;
 				// forward to HW monitor
 				hwmon_show_ds1820_event (0, 0, c, 0, 0);
 
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("No Slave %d\n"), c);
 #endif
 				break;
 			}
 			// issue conversion start
 			ds1820_state [p->hw_channel] = DS1820_START_CONVERSION;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Slave %d ok\n"), c);
 #endif
 		break;
@@ -105,7 +105,7 @@ _O_DS1820_t*	p;
 			send_1wire_byte (DS1820_CMD_CONVERT, c);
 			ds1820_state [p->hw_channel] = DS1820_END_OF_CONVERSION;
 			ds1820_timer [p->hw_channel] = DS1820_CONVERSION_TICKS;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Conversion %d\n"), c);
 #endif
 		break;
@@ -118,14 +118,14 @@ _O_DS1820_t*	p;
 				// forward to HW monitor
 				hwmon_show_ds1820_event (0, 0, c, 0, 0);
 
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("No Slave %d\n"), c);
 #endif
 				break;
 			}
 			// issue conversion start
 			ds1820_state [p->hw_channel] = DS1820_READ0;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Slave %d ok\n"), c);
 #endif
 		break;
@@ -137,20 +137,20 @@ _O_DS1820_t*	p;
 			ds1820_temp[c] = b;
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ1;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
 		case DS1820_READ1:
 			b = receive_1wire_byte(c);
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 			w= ds1820_temp[c];
 			w |= (int16_t) (b << 8);
 			ds1820_temp[c] = w;
 			ds1820_temp[c] *= 0.5;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %4.4x = %2.2f C\n"), w, ds1820_temp[c]);
 #endif
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
@@ -160,7 +160,7 @@ _O_DS1820_t*	p;
 			b = receive_1wire_byte(c);
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ3;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
@@ -168,7 +168,7 @@ _O_DS1820_t*	p;
 			b = receive_1wire_byte(c);
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ4;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
@@ -176,7 +176,7 @@ _O_DS1820_t*	p;
 			b = receive_1wire_byte(c);
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ5;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
@@ -184,7 +184,7 @@ _O_DS1820_t*	p;
 			b = receive_1wire_byte(c);
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ6;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
@@ -194,7 +194,7 @@ _O_DS1820_t*	p;
 			ds1820_remain[c] = b;
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ7;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
@@ -206,13 +206,13 @@ _O_DS1820_t*	p;
 			r = b - ds1820_remain[c];
 			ds1820_temp[c] += (-0.25 + r/b);
 
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("With remainder %2.2f C\n"), ds1820_temp[c]);
 #endif
 
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ8;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
@@ -220,7 +220,7 @@ _O_DS1820_t*	p;
 			b = receive_1wire_byte(c);
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d with CRC=%2.2x\n"), b, c, ds1820_crc[c]);
 #endif
 
@@ -230,7 +230,7 @@ _O_DS1820_t*	p;
 			// add temperature offset
 			r = p->temp_offset;
 			ds1820_temp[c] += r/10;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("With offset %2.2f C\n"), ds1820_temp[c]);
 #endif
 
@@ -270,7 +270,7 @@ _O_DS1820_t*	p;
 
 		// should never happen
 		default: ds1820_state[c] = DS1820_IDLE;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("ERROR: default state hit for %d\n"), c);
 #endif
 	}
@@ -304,14 +304,14 @@ _O_DS1820_t*	p;
 				// forward to HW monitor
 				hwmon_show_ds1820_event (0, 0, c, 0, 0);
 
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("No Slave %d\n"), c);
 #endif
 				break;
 			}
 			// issue conversion start
 			ds1820_state [p->hw_channel] = DS1820_START_CONVERSION;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Slave %d ok\n"), c);
 #endif
 		break;
@@ -320,7 +320,7 @@ _O_DS1820_t*	p;
 			send_1wire_byte (DS1820_CMD_CONVERT, c);
 			ds1820_state [p->hw_channel] = DS1820_END_OF_CONVERSION;
 			ds1820_timer [p->hw_channel] = DS1820_CONVERSION_TICKS;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Conversion %d\n"), c);
 #endif
 		break;
@@ -333,14 +333,14 @@ _O_DS1820_t*	p;
 				// forward to HW monitor
 				hwmon_show_ds1820_event (0, 0, c, 0, 0);
 
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("No Slave %d\n"), c);
 #endif
 				break;
 			}
 			// issue data read start
 			ds1820_state [p->hw_channel] = DS1820_READ0;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Slave %d ok\n"), c);
 #endif
 		break;
@@ -352,19 +352,19 @@ _O_DS1820_t*	p;
 			ds1820_temp[c] = b;
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ1;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
 		case DS1820_READ1:
 			b = receive_1wire_byte(c);
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 			w= ds1820_temp[c];
 			w |= b << 8;
 			ds1820_temp[c] = w * 0.0625; // 12 bit resolution
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %4.4x = %2.2f C\n"), w, ds1820_temp[c]);
 #endif
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
@@ -374,7 +374,7 @@ _O_DS1820_t*	p;
 			b = receive_1wire_byte(c);
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ3;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
@@ -382,7 +382,7 @@ _O_DS1820_t*	p;
 			b = receive_1wire_byte(c);
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ4;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
@@ -390,7 +390,7 @@ _O_DS1820_t*	p;
 			b = receive_1wire_byte(c);
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ5;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
@@ -398,7 +398,7 @@ _O_DS1820_t*	p;
 			b = receive_1wire_byte(c);
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ6;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
@@ -406,7 +406,7 @@ _O_DS1820_t*	p;
 			b = receive_1wire_byte(c);
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ7;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
@@ -414,7 +414,7 @@ _O_DS1820_t*	p;
 			b = receive_1wire_byte(c);
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 			ds1820_state [p->hw_channel] = DS1820_READ8;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d\n"), b, c);
 #endif
 		break;
@@ -422,7 +422,7 @@ _O_DS1820_t*	p;
 			b = receive_1wire_byte(c);
 			ds1820_crc[c] = _crc_ibutton_update (ds1820_crc[c], b);
 
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("Read %2.2x from %d with CRC=%2.2x\n"), b, c, ds1820_crc[c]);
 #endif
 
@@ -432,7 +432,7 @@ _O_DS1820_t*	p;
 			// add temperature offset
 			r = p->temp_offset;
 			ds1820_temp[c] += r/10;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("With offset %2.2f C\n"), ds1820_temp[c]);
 #endif
 
@@ -472,7 +472,7 @@ _O_DS1820_t*	p;
 
 		// should never happen
 		default: ds1820_state[c] = DS1820_IDLE;
-#ifdef LCD_DEBUG
+#ifdef HW_DEBUG
     printf_P(PSTR("ERROR: default state hit for %d\n"), c);
 #endif
 	}
