@@ -1,8 +1,8 @@
 /** \file NandFlash.c
- *  \brief NAND Flash driver library. 
+ *  \brief NAND Flash driver library.
  *	This module is part of the EIB-LCD Controller Firmware
  *
- *	This module contains functions for the external NAND Flash device to 
+ *	This module contains functions for the external NAND Flash device to
  *	- initialize the memory device,
  *	- read data from Flash,
  *	- erase and write,
@@ -37,7 +37,7 @@ static uint8_t flash_qfi_mode;
 int write_nand_flash (uint8_t sector, uint16_t offset, uint16_t size, uint8_t* data)
 {
 uint16_t	ws, i;
-	
+
 	if (offset+size <= FLASH_SECTOR_SIZE)
 		ws = size;
 	else
@@ -142,7 +142,7 @@ uint8_t read_flash_qfi_info (uint8_t address)
 		FLASH_SELECT_SECTOR (0);
 		OUTB(CPLD_BASE_ADDR + UPPER_DATA_WR_ADDR, 0x00);
 		OUTB((FLASH_BASE_ADDRESS + 0x55), 0x98);
-	
+
 		// poll for ready signal from Flash
 		//FIXME: should allow escape path on timeout
 		while (!FLASH_READY_STATE);
@@ -165,7 +165,7 @@ uint8_t read_flash_qfi_info (uint8_t address)
  * \param start_block First block to erase
  */
 uint8_t erase_complete_flash(uint8_t blocks, uint8_t start_block)
-{	
+{
 	uint8_t erased_blocks;
 
 	if( (start_block+blocks-1) > FLASH_MAX_SECTOR)
@@ -175,21 +175,21 @@ uint8_t erase_complete_flash(uint8_t blocks, uint8_t start_block)
 		#endif
 		return 1;	// Error out of range
 	}
-	
+
 	/* invalidate Flash content to prevent any function accessing inconsistent Flash data */
 	set_flash_content_invalid();
 
 	/* enable Flash wait */
 	XMCRA |= (1<<SRW11); // wait
 	MCUCR |= (1<<SRW10); // wait
-	
+
 	init_download_progress(blocks);
-	
+
 	for(erased_blocks=0; erased_blocks <= blocks; erased_blocks++)
 	{
 		show_erase_progress(erased_blocks);
 		// Zap Block
-		erase_flash_sector (start_block+erased_blocks);	
+		erase_flash_sector (start_block+erased_blocks);
 	}
 
 	/* disable Flash wait */
@@ -215,7 +215,7 @@ uint8_t file_2_nand_flash ( char *filename, uint32_t start_address )
 uint8_t * buffer; /*! pointer to the file data buffer */
 uint8_t * bptr;
 int16_t read_bytes, written_words;
-uint16_t flash_address; 
+uint16_t flash_address;
 uint8_t	 flash_sector, last_sector;
 uint32_t downloadtotal; /*! total file size to be downloaded into the Flash memory */
 unsigned char result;
@@ -244,7 +244,7 @@ unsigned char result;
 
 	last_sector = 0xff;
 	while (result==F_OK) {
-				
+
 		read_bytes = Fread(buffer,FILE_READ_BUFF_SIZE);
 		downloadtotal += read_bytes;
 		show_download_progress (downloadtotal);
@@ -284,7 +284,7 @@ unsigned char result;
 	/* disable Flash wait */
 	XMCRA &= 0xff ^ (1<<SRW11); // no wait
 	MCUCR &= 0xff ^ (1<<SRW10); // no wait
-	
+
 	return 0; /*! download successfully completed */
 }
 
@@ -316,7 +316,7 @@ uint16_t hb;
 	// read low byte
 	hb = INB(FLASH_BASE_ADDRESS + offset);
 	// read high byte
-	lb = INB(CPLD_BASE_ADDR + UPPER_DATA_RD_ADDR); 
+	lb = INB(CPLD_BASE_ADDR + UPPER_DATA_RD_ADDR);
 
 	NutExitCritical ();
 
@@ -359,7 +359,7 @@ uint16_t hb;
 	/* read high byte */
 	hb = INB(offset);
 	/* read low byte */
-	lb = INB(CPLD_BASE_ADDR + UPPER_DATA_RD_ADDR); 
+	lb = INB(CPLD_BASE_ADDR + UPPER_DATA_RD_ADDR);
 	/* restore Flash sector and DMA settings */
 	OUTB (CPLD_BASE_ADDR + MODE_CTRL_ADDR, dma_setting_save);
 	FLASH_SELECT_SECTOR (sector_setting_save);
@@ -403,11 +403,11 @@ void init_nand_flash ()
 {
 	// Not in QFI mode
 	flash_qfi_mode = 0;
-	
+
 	/* init Flash control pins */
 	INIT_FLASH_RESET
 	INIT_FLASH_BUSY
-	
+
 	/* Reset Flash state machine */
 	SET_FLASH_RESET_ACTIVE
 	FLASH_500ns_DELAY

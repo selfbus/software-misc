@@ -19,18 +19,16 @@
 #include <sys/timer.h>
 #include <sys/thread.h>
 #include "MemoryMap.h"
-#include "ssd1963.h"
-
-//#define	BYTE2COLOR(red, green, blue) ( ((red) & 0xf8) << 8) | ( ((green) & 0xfc) << 3) | (((blue) & 0xf8) >> 3)
+#include "ssd1963_cmd.h"
 
 
-#if DEVID == 0x32024001
-#define HX8347A		// this is the old LCD controller sold until b/o 2011
-#endif
+// TFT modules using the same controller
+#define SSD1963_TYPE_0	0		// 5.0" 800 x 480 display with SD Slot
+#define SSD1963_TYPE_1	1		// 5.0" 800 x 480 display (old version)
+#define SSD1963_TYPE_2	2		// 4.3" 480 x 272 display with SD Slot
+#define SSD1963_TYPE_3	3		// 7.0" 800 x 480 display with SD Slot
+#define SSD1963_TYPE_4	4		// 4.3" 480 x 272 display without SD Slot
 
-#if DEVID == 0x32024003
-#define ILI9325 // this is the 2.4" LCD controller
-#endif
 
 #define	HX8347_MASK  0xffff
 #define	HX8347_R00	 0x0000
@@ -50,13 +48,6 @@
 #define CTRL_SSD1289	2	//SSD1289
 #define CTRL_ILI9325	3	//ILI9325 2.4" 180� rotated
 #define CTRL_SSD1963	4	//SSD1963 5.0"
-
-// The calibration values are always related to ly and lx
-// Touch offset values for 3.2" LCD
-#define SSD1289_Y_OFFSET		200
-#define SSD1289_Y_OFFSET_FACT	15
-#define SSD1289_X_OFFSET		350
-#define SSD1289_X_OFFSET_FACT	11
 
 #define LCD_POINTER	0x00
 #define LCD_DATA	0x01
@@ -159,11 +150,34 @@ int lx;
 int	ly;
 } t_touch_event;
 
+/*
+* These variables permit communication between the common TFT driver part in tft_io and the panel
+* specific driver modules.
+*  ==============================================================================
+*/
+
 extern volatile uint8_t controller_type; // 0=unknown, 1 = HX8347-A, 2=SSD1289, 3=ILI9325 2.4" 180� rotated
 extern volatile uint16_t controller_id; // R00 value
 extern volatile uint8_t lcd_type;		// Resistor coding used to distinguish between LCDs if controller type is same
 extern volatile uint8_t invert_touch_y; // invert X coordinate of touch position
 extern volatile uint8_t invert_touch_x; // invert Y coordinate of touch position
+
+// global variables used by the TFT base driver
+extern volatile uint16_t screen_max_x; // max X coordinate of display
+extern volatile uint16_t screen_max_y; // max Y coordinate of display
+extern volatile int16_t lx, ly; // screen coordinates of touch event
+extern volatile int16_t TP_X, TP_Y;	// absolute coordinates of touch event
+extern volatile uint8_t rotate;     // rotates screen by 180° when true
+
+// this function handles the touch event for the TFT in use
+extern void (*drv_convert_touch_coordinates)(void);
+// this function sets the address pointer for the next display data write operation
+extern void (*drv_address_set)(unsigned int, unsigned int, unsigned int, unsigned int);
+extern void (*drv_lcd_rotate)(uint8_t rotation);
+
+/*
+*  ===================== End of driver communication block ======================
+*/
 
 void tft_set_reset_active (void);
 void tft_set_reset_inactive (void);
@@ -232,6 +246,11 @@ void tft_put_flash_image (uint16_t,uint16_t,uint16_t,uint16_t, uint32_t);
  */
 void tft_fill_rect (uint16_t, uint16_t,uint16_t,uint16_t,uint16_t);
 
+/** sent data to tft
+ *
+ */
+void main_W_com_data(uint8_t, uint16_t);
+
 
 // Used to outsource driver
 
@@ -240,8 +259,8 @@ void tft_fill_rect (uint16_t, uint16_t,uint16_t,uint16_t,uint16_t);
 uint8_t tft_read_byte(void);
 
 // get max display dimensions for the TFT screen
-inline uint16_t get_max_x(void);
-inline uint16_t get_max_y(void);
+inline int16_t get_max_x(void);
+inline int16_t get_max_y(void);
 // set backlight to full intensity
 void set_backlight_on (void);
 

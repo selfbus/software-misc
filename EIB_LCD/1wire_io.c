@@ -236,7 +236,7 @@ uint8_t t, bit_count, wait_count;
 
 		if(wait_count > 100) {
 #ifdef HW_DEBUG
-	printf_P(PSTR("DHT11 L Response Timeout\n"));
+	printf_P(PSTR("DHT Sensor L Timeout\n"));
 #endif
 			// Delete previous sample
 			data[0] = 0;
@@ -255,13 +255,14 @@ uint8_t t, bit_count, wait_count;
 
 		if(wait_count > 100) {	// Around 47
 #ifdef HW_DEBUG
-	printf_P(PSTR("DHT11 H Response Timeout\n"));
+	printf_P(PSTR("DHT H Response Timeout\n"));
 #endif
 			return 2;	// Error
 		}
 	}
 
-	// Sample bits
+	// Sample 40 bits, timeout after last bit ensures that sensor has ended transmission
+	// DHT pulls bus low after 40bits, this will be sampled as 1, then Low timeout at bit 41
 	for (bit_count = 0; bit_count<40; bit_count++) {
 		// Wait for falling edge, start of next bit
 		wait_count = 0;
@@ -270,7 +271,7 @@ uint8_t t, bit_count, wait_count;
 
 			if(wait_count > 100) {
 #ifdef HW_DEBUG
-	printf_P(PSTR("DHT11 Bit %d Wait Timeout\n"), bit_count);
+	printf_P(PSTR("DHT Bit %d Falling Edge Timeout\n"), bit_count);
 #endif
 				return 3;	// Error
 			}
@@ -283,20 +284,57 @@ uint8_t t, bit_count, wait_count;
 
 			if(wait_count > 100) {
 #ifdef HW_DEBUG
-	printf_P(PSTR("DHT11 Bit %d Timeout\n"), bit_count);
+	printf_P(PSTR("DHT Bit %d Timeout\n"), bit_count);
 #endif
 				return 4;	// Error
 			}
 		}
 
+		// Wait at least 28µS
 		for (t = 0; t < DELAY_CONST_1WIRE_DHT_MASTER_1; t++)
 			asm volatile ("nop");
 
+		// Sample current bit
 		if (sample_1wire_pulse(hw_channel))
 			data[bit_count/8] |= (1<<(7-(bit_count%8)));
 		else
 			data[bit_count/8] &= ~(1<<(7-(bit_count%8)));
 	}
-	return 0;	// OK
+
+	// After 40bits the transmission should be done
+	// Sensor pulls bus low to indicate stop and will release it --> timeout if OK
+	for (bit_count = 0; bit_count<2; bit_count++) {
+		// Wait for falling edge to indicate stop
+		wait_count = 0;
+		while (sample_1wire_pulse(hw_channel)) {
+			wait_count++;
+
+			if(wait_count > 100) {
+#ifdef HW_DEBUG
+	printf_P(PSTR("DHT Stop detected after %d Falling Edge  "), bit_count);
+	if(bit_count) printf_P(PSTR("OK :-)\n"));
+	else printf_P(PSTR("BAD :-(\n"));
+#endif
+				if(bit_count)
+					return 0;	// OK, timeout during second run
+				else
+					return 5;	// Stop pulse missing
+			}
+		}
+
+		// Wait for bus release
+		while (!sample_1wire_pulse(hw_channel)) {
+			wait_count++;
+
+			if(wait_count > 100) {
+#ifdef HW_DEBUG
+	printf_P(PSTR("DHT Bus release %d Timeout\n"), bit_count);
+#endif
+				return 6;	// Error
+			}
+		}
+	}
+
+	return 7;	// Got too many bits
 }
 

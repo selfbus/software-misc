@@ -75,7 +75,7 @@ void init_hardware (void) {
 	SPSR = 0;
 
 	backlight_dimming = 25;
-	backlight_active = 255;
+	backlight_active = 127;
 
 }
 

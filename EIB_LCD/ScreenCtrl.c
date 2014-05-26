@@ -246,6 +246,12 @@ uint16_t addr;
     printf_tft_P( TFT_COLOR_BLUE, TFT_COLOR_WHITE, PSTR("Firmware V%d.%d"), pgm_read_byte_far((char*)&bootlodrinfo.app_version +1), pgm_read_byte_far((char*)&bootlodrinfo.app_version));
 	printf_tft_P( TFT_COLOR_ORANGE, TFT_COLOR_WHITE, PSTR("Build %s"), __TIMESTAMP__);
 
+#if defined(LCD_DEBUG) || defined(HW_DEBUG) || defined(TOUCH_DEBUG)
+	printf_tft_P( TFT_COLOR_RED, TFT_COLOR_BLACK, PSTR("W A R N I N G  This is a DEBUG build!"));
+#else
+	printf_tft_P( TFT_COLOR_BLUE, TFT_COLOR_WHITE, PSTR("RELEASE build"));
+#endif
+
 	addr = eib_get_device_address(EIB_DEVICE_CHANNEL);
     printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("Phys. Addr %d.%d.%d"), (addr >> 4) & 0x0f, addr & 0x0f, (addr >> 8) & 0xff );
 	if (display_orientation == DISPLAY_ORIENTATION_HOR)
@@ -257,6 +263,8 @@ uint16_t addr;
 	else if (display_orientation == DISPLAY_ORIENTATION_UPSIDE)
     	printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("180"));
 
+    printf_tft_P( TFT_COLOR_WHITE, TFT_COLOR_BLACK, PSTR("Touch mirror (x/y): %d/%d"), invert_touch_x, invert_touch_y);
+
 	if (eib_get_status() == EIB_NORMAL)
     	printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("EIB online"));
 	else
@@ -264,6 +272,8 @@ uint16_t addr;
 
 	printf_tft_P (TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("TFT Controller= %d, R00=%4.4x"), controller_type, controller_id, lcd_type);
 	printf_tft_P (TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("R-Code %u,   Resolution %u x %u"), lcd_type, get_max_x()+1, get_max_y()+1);
+
+    // Draw Button
 	draw_button (ERASE_BUTTON_XPOS, ERASE_BUTTON_YPOS, BUTTON_WIDTH, "Erase Flash");		// added by sh
 	draw_button (MONITOR_BUTTON_XPOS, MONITOR_BUTTON_YPOS, BUTTON_WIDTH, "Monitor");
 	draw_button (DOWNLOAD_BUTTON_XPOS, DOWNLOAD_BUTTON_YPOS, BUTTON_WIDTH, "Download");
