@@ -5,5 +5,4 @@
 *.lst
 *.o
 *.map
-*.bin
 *.elf
