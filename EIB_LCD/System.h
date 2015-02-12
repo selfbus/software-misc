@@ -109,7 +109,7 @@ uint8_t		checksum;
 #define	LCD_HEADER_MAGIC_2			0x4443
 // V1.0
 #define LCD_HEADER_VERSION_ADDR		0, 0x03
-#define LCD_VERSION_EXPECTED		0x1D
+#define LCD_VERSION_EXPECTED		0x1E
 // Physical Address
 #define LCD_HEADER_PHYSICAL_ADDR_LB	0, 0x03
 #define LCD_HEADER_PHYSICAL_ADDR_HB	0, 0x04
@@ -148,7 +148,7 @@ uint32_t	size;
 //EIB_LCD.c
 extern const bootldrinfo_t bootlodrinfo;
 //EIB_LCD.c
-extern uint8_t flash_content_ok;
+extern uint8_t flash_content_bad;
 
 
 /* DeviceCtrl.c */
@@ -159,7 +159,7 @@ short store_to_NVMEM (char *data, short len, short NVOffset);
 short read_from_NVMEM (char *data, short len, short NVOffset);
 
 /* System.c */
-//0=horizontal, 1=90�left, 2=90�right, 3=180�
+//0=horizontal, 1=90°left, 2=90°right, 3=180°
 #define DISPLAY_ORIENTATION_HOR		0
 #define DISPLAY_ORIENTATION_90L		1
 #define DISPLAY_ORIENTATION_90R		2
@@ -173,7 +173,7 @@ void init_hardware (void);
 // init block device for SD card read
 void init_sd_card (void);
 // evaluate flash contents and init system
-uint8_t	init_system_from_flash (void);
+int8_t	init_system_from_flash (void);
 // tries to download config file from SD card
 uint8_t	download_from_sd_card (void);
 // mounts SD card.
@@ -191,7 +191,8 @@ void init_physical_address_from_Flash (void);
 void set_flash_content_invalid(void);
 // check for connected TFT module type
 uint8_t check_lcd_type_code (void);
-
+// reboot system
+void reboot (void);
 
 
 #endif // _SYSTEM_H_

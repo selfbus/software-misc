@@ -7,7 +7,7 @@
  *	- use symbols stored as icons in the Nand Flash
  *	- change displayed value on reception of EIB messages
  *
- *	Copyright (c) 2011-2013 Arno Stock <arno.stock@yahoo.de>
+ *	Copyright (c) 2011-2015 Arno Stock <arno.stock@yahoo.de>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License version 2 as
@@ -140,11 +140,25 @@ uint16_t show_value_string_180 (uint16_t ofs_0, uint16_t x1, uint16_t y1, char *
 
 void show_value_string_with_postfix (_E_VALUE_t* p, char *str) {
 
-uint16_t post_pict = p->picture_index1 + PICTURE_OFFSET_POSTFIXUNIT;
-uint16_t ofs_0 = p->picture_index1 + PICTURE_OFFSET_ZERO;
+uint16_t post_pict;
+uint16_t ofs_0;
 uint16_t x1 = p->x_pos;
 uint16_t y1 = p->y_pos;
 uint16_t tdx = p->text_x;
+
+	// change color in case of timeout
+	if ((p->timeout_time) && ((p->timeout_time * 60) < lcd_get_timeout_counter(p->eib_object_listen))) {
+		XRAM_SELECT_BLOCK(XRAM_PAGE_PAGE);
+		post_pict = p->picture_timeout_index1 + PICTURE_OFFSET_POSTFIXUNIT;
+		ofs_0 = p->picture_timeout_index1 + PICTURE_OFFSET_ZERO;
+		p->parameter |= VALUE_PARAMETER_TIMEOUT_CONDITION;
+	}
+	else {
+		XRAM_SELECT_BLOCK(XRAM_PAGE_PAGE);
+		post_pict = p->picture_index1 + PICTURE_OFFSET_POSTFIXUNIT;
+		ofs_0 = p->picture_index1 + PICTURE_OFFSET_ZERO;
+		p->parameter &= (0xff ^ VALUE_PARAMETER_TIMEOUT_CONDITION);
+	}
 
 	if (display_orientation == DISPLAY_ORIENTATION_HOR) {
 		draw_picture (post_pict, show_value_string (ofs_0, x1+tdx, y1, str), y1);
@@ -269,6 +283,34 @@ _E_VALUE_t*	p;
 
 	p = (_E_VALUE_t*) cp;
 
-	if (p->eib_object_listen == obj)
+	if (p->eib_object_listen == obj) {
 		draw_value_element (cp);
+	}
+}
+
+void check_value_timeout (char* cp) {
+
+_E_VALUE_t*	p;
+
+	p = (_E_VALUE_t*) cp;
+
+	// does thsi value observe the timeout condition?
+	if (!p->timeout_time)
+		return;
+	// check timeout condition of object
+	if ((p->timeout_time) && ((p->timeout_time * 60) < lcd_get_timeout_counter(p->eib_object_listen))) {
+		XRAM_SELECT_BLOCK(XRAM_PAGE_PAGE);
+		// timeout ocurred, is it already flagged?
+		if (!(p->parameter & VALUE_PARAMETER_TIMEOUT_CONDITION)) {
+			draw_value_element (cp);
+		}
+	}	
+	else {
+		XRAM_SELECT_BLOCK(XRAM_PAGE_PAGE);
+		// timeout did not ocur
+		if ((p->parameter & VALUE_PARAMETER_TIMEOUT_CONDITION)) {
+			draw_value_element (cp);
+		}
+	}
+
 }

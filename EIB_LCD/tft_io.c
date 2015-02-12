@@ -31,14 +31,14 @@
 t_touch_event touch_event;
 volatile uint8_t backlight_dimming;
 volatile uint8_t backlight_active;
-volatile uint8_t controller_type; // 0=unknown, 1 = HX8347-A, 2=SSD1289, 3=ILI9325 2.4" 180� rotated, 4=ssd1963
+volatile uint8_t controller_type; // 0=unknown, 1 = HX8347-A, 2=SSD1289, 3=ILI9325 2.4" 180° rotated, 4=ssd1963
 volatile uint16_t controller_id;
 volatile uint8_t lcd_type;		 // Resistor coding used to distinguish between LCDs if controller type is same
 volatile uint8_t invert_touch_y; // invert X coordinate of touch position
 volatile uint8_t invert_touch_x; // invert Y coordinate of touch position
+volatile uint8_t lcd_rotation;  // hardware 180° rotation of LCD screen (needs support of LCD controller!)
 volatile uint16_t screen_max_x; // max X coordinate of display
 volatile uint16_t screen_max_y; // max Y coordinate of display
-volatile uint8_t rotate; // rotate screen by 180�
 void (*drv_convert_touch_coordinates)(void);	// this function handles the touch event for the TFT in use
 void (*drv_address_set)(unsigned int x1, unsigned int y1, unsigned int x2, unsigned int y2);
 void (*drv_lcd_rotate)(uint8_t rotation);
@@ -223,7 +223,7 @@ void tft_init_sequence(void) {
 
 	}
 #ifdef LCD_DEBUG
-	printf_P(PSTR("\nController-ID= %d"), controller_type);
+	printf_P(PSTR("\nController-ID= %u\n"), controller_type);
 #endif
 
 	if (controller_type == CTRL_HX8347) {

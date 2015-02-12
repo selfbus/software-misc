@@ -277,7 +277,7 @@ uint8_t t, bit_count, wait_count;
 			}
 		}
 
-		// Wait for resign edge, sample length. 26-28µs = 0, 70us = 1
+		// Wait for resign edge, sample length. 26-28Âµs = 0, 70us = 1
 		wait_count = 0;
 		while (!sample_1wire_pulse(hw_channel)) {
 			wait_count++;
@@ -290,7 +290,7 @@ uint8_t t, bit_count, wait_count;
 			}
 		}
 
-		// Wait at least 28µS
+		// Wait at least 28ÂµS
 		for (t = 0; t < DELAY_CONST_1WIRE_DHT_MASTER_1; t++)
 			asm volatile ("nop");
 

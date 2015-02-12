@@ -27,6 +27,7 @@
 #define SYSTEM_PAGE_MONITOR_SELECTION	6	// page to select monitor function
 #define SYSTEM_PAGE_HARDWARE_MONITOR	7	// hardware monitor page (IR, Buttons, ...)
 #define SYSTEM_PAGE_FLASH_CONTROL		8	// flash erase page (erase external flash)
+#define SYSTEM_PAGE_REBOOT_CONFIRM		9	// confirm system reboot
 
 #define	BYTE2COLOR(red, green, blue) ( ((red) & 0xf8) << 8) | ( ((green) & 0xfc) << 3) | (((blue) & 0xf8) >> 3)
 
@@ -42,7 +43,6 @@ void init_download_progress(uint32_t);
 void check_screen_lock(void);
 void init_screen_control (void);
 void busmon_show (t_eib_frame *);
-void refresh_backlight (void);
 void hwmon_show_ir_event (void);
 void hwmon_show_ds1820_event (double, int8_t, uint8_t, uint8_t, uint8_t);
 void hwmon_show_dht_event (double, double, double, int8_t, int8_t, uint8_t, uint8_t, uint8_t, uint8_t);

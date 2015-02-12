@@ -61,6 +61,8 @@ uint8_t G_pri_address;		// Address for PRI table within QFI info
 #define CLRSCN_BUTTON_YPOS		204
 #define	EXIT_BUTTON_XPOS		214
 #define	EXIT_BUTTON_YPOS		204
+#define REBOOT_BUTTON_XPOS		214
+#define REBOOT_BUTTON_YPOS		160
 #define	DOWNLOAD_LIST_UP_XPOS	004
 #define DOWNLOAD_LIST_UP_YPOS	204
 #define	DOWNLOAD_LIST_DOWN_XPOS	054
@@ -75,11 +77,19 @@ uint8_t G_pri_address;		// Address for PRI table within QFI info
 #define FLASH_ERASE_BUTTON_XPOS 109
 #define FLASH_ERASE_BUTTON_YPOS 204
 
+// Confirm reboot
+#define REBOOT_CONFIRM_BUTTON_XPOS	4
+#define REBOOT_CONFIRM_BUTTON_YPOS	160
+#define LCD_ROTATE_BUTTON_XPOS	    54
+#define LCD_ROTATE_BUTTON_YPOS	    204
+#define CANCEL_BUTTON_XPOS			214
+#define CANCEL_BUTTON_YPOS			204
+
 #define CHARACTER_WIDTH			8
 #define BUTTON_TEXT_OFFSET		8
 
 // draws a simple button
-void draw_button (uint16_t x_pos, uint16_t y_pos, uint8_t width, char *face) {
+static void draw_button (uint16_t x_pos, uint16_t y_pos, uint8_t width, char *face) {
 
 	// draw inner area
 	tft_fill_rect (BYTE2COLOR (128,128,128), x_pos+1,y_pos+1,x_pos+width-1,y_pos+BUTTON_HEIGHT-1);
@@ -97,7 +107,7 @@ void draw_button (uint16_t x_pos, uint16_t y_pos, uint8_t width, char *face) {
 }
 
 // 1 = hit, 0=not hit
-uint8_t check_button (uint16_t x_pos, uint16_t y_pos, uint8_t width, t_touch_event *evt) {
+static uint8_t check_button (uint16_t x_pos, uint16_t y_pos, uint8_t width, t_touch_event *evt) {
 
 	return 	(x_pos < evt->lx) && (y_pos < evt->ly) && (x_pos + width > evt->lx) && (y_pos + BUTTON_HEIGHT > evt->ly);
 
@@ -124,7 +134,7 @@ uint8_t	 list_lines_in_box;
 #define	LIST_SELECTION_BOX_W	5
 #define	LIST_SELECTION_BOX_H	5
 
-void init_selection_list (char* (*get_list_item)(uint8_t), uint8_t length, uint8_t selected, uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+static void init_selection_list (char* (*get_list_item)(uint8_t), uint8_t length, uint8_t selected, uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
 
 	// set variables
 	list_get_item_string = get_list_item;
@@ -157,7 +167,7 @@ void init_selection_list (char* (*get_list_item)(uint8_t), uint8_t length, uint8
 	}
 }
 
-void selection_list_update_selection(int step) {
+static void selection_list_update_selection(int step) {
 
 uint16_t line_y;
 int	new_list_selected_item;
@@ -182,7 +192,7 @@ int	new_list_selected_item;
 									  		list_x_pos + LIST_SELECTION_BOX_X + LIST_SELECTION_BOX_W-2, 	line_y + LIST_SELECTION_BOX_Y + LIST_SELECTION_BOX_H-2);
 }
 
-uint8_t selection_list_get_selected_item (void) {
+static uint8_t selection_list_get_selected_item (void) {
 	return list_selected_item;
 }
 
@@ -240,11 +250,11 @@ void create_system_info_screen (void) {
 
 uint16_t addr;
 
-	tft_clrscr(TFT_COLOR_LIGHTGRAY);	// White before
+	tft_clrscr(TFT_COLOR_LIGHTGRAY);
 
-    printf_tft_P( TFT_COLOR_BLUE, TFT_COLOR_WHITE, PSTR("Nut/OS %s "), NutVersionString());
-    printf_tft_P( TFT_COLOR_BLUE, TFT_COLOR_WHITE, PSTR("Firmware V%d.%d"), pgm_read_byte_far((char*)&bootlodrinfo.app_version +1), pgm_read_byte_far((char*)&bootlodrinfo.app_version));
-	printf_tft_P( TFT_COLOR_ORANGE, TFT_COLOR_WHITE, PSTR("Build %s"), __TIMESTAMP__);
+	printf_tft_P( TFT_COLOR_BLUE, TFT_COLOR_WHITE, PSTR("Nut/OS %s "), NutVersionString());
+	printf_tft_P( TFT_COLOR_BLUE, TFT_COLOR_WHITE, PSTR("Firmware V%d.%d"), pgm_read_byte_far((char*)&bootlodrinfo.app_version +1), pgm_read_byte_far((char*)&bootlodrinfo.app_version));
+	printf_tft_P( TFT_COLOR_ORANGE, TFT_COLOR_WHITE, PSTR("Build %s %s"), __DATE__, __TIME__);
 
 #if defined(LCD_DEBUG) || defined(HW_DEBUG) || defined(TOUCH_DEBUG)
 	printf_tft_P( TFT_COLOR_RED, TFT_COLOR_BLACK, PSTR("W A R N I N G  This is a DEBUG build!"));
@@ -252,37 +262,55 @@ uint16_t addr;
 	printf_tft_P( TFT_COLOR_BLUE, TFT_COLOR_WHITE, PSTR("RELEASE build"));
 #endif
 
-	addr = eib_get_device_address(EIB_DEVICE_CHANNEL);
-    printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("Phys. Addr %d.%d.%d"), (addr >> 4) & 0x0f, addr & 0x0f, (addr >> 8) & 0xff );
-	if (display_orientation == DISPLAY_ORIENTATION_HOR)
-    	printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("Horizontal"));
-	else if (display_orientation == DISPLAY_ORIENTATION_90L)
-    	printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("90 left"));
-	else if (display_orientation == DISPLAY_ORIENTATION_90R)
-    	printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("90 right"));
-	else if (display_orientation == DISPLAY_ORIENTATION_UPSIDE)
-    	printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("180"));
+    // Display error message if flash content is not valid
+    if(!flash_content_bad) {
+	    addr = eib_get_device_address(EIB_DEVICE_CHANNEL);
+        printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("Phys. Addr %d.%d.%d"), (addr >> 4) & 0x0f, addr & 0x0f, (addr >> 8) & 0xff );
+	    if (display_orientation == DISPLAY_ORIENTATION_HOR)
+    	    printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("Horizontal"));
+	    else if (display_orientation == DISPLAY_ORIENTATION_90L)
+    	    printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("90 left"));
+	    else if (display_orientation == DISPLAY_ORIENTATION_90R)
+    	    printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("90 right"));
+	    else if (display_orientation == DISPLAY_ORIENTATION_UPSIDE)
+    	    printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("180"));
 
-    printf_tft_P( TFT_COLOR_WHITE, TFT_COLOR_BLACK, PSTR("Touch mirror (x/y): %d/%d"), invert_touch_x, invert_touch_y);
+        printf_tft_P( TFT_COLOR_WHITE, TFT_COLOR_BLACK, PSTR("Touch mirror (x/y): %d/%d"), invert_touch_x, invert_touch_y);
 
-	if (eib_get_status() == EIB_NORMAL)
-    	printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("EIB online"));
-	else
-    	printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("EIB offline"));
+	    if (eib_get_status() == EIB_NORMAL)
+    	    printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("EIB online"));
+	    else
+    	    printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("EIB offline"));
 
-	printf_tft_P (TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("TFT Controller= %d, R00=%4.4x"), controller_type, controller_id, lcd_type);
-	printf_tft_P (TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("R-Code %u,   Resolution %u x %u"), lcd_type, get_max_x()+1, get_max_y()+1);
+	    printf_tft_P (TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("TFT Controller= %d, R00=%4.4x"), controller_type, controller_id, lcd_type);
+	    printf_tft_P (TFT_COLOR_BLACK, TFT_COLOR_WHITE, PSTR("R-Code %u,   Resolution %u x %u"), lcd_type, get_max_x()+1, get_max_y()+1);
 
-    // Draw Button
-	draw_button (ERASE_BUTTON_XPOS, ERASE_BUTTON_YPOS, BUTTON_WIDTH, "Erase Flash");		// added by sh
+        // Draw Exit Button
+        draw_button (EXIT_BUTTON_XPOS, EXIT_BUTTON_YPOS, BUTTON_WIDTH, "Exit");
+    }
+    else if (flash_content_bad == 2) {
+        printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("Flash empty, please load a project!"));
+        printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("Found Magic: %#x %#x %#x"), read_flash (LCD_HEADER_MAGIC_ADDR_0), read_flash (LCD_HEADER_MAGIC_ADDR_1),read_flash (LCD_HEADER_MAGIC_ADDR_2));
+    }
+    else if (flash_content_bad == 3) {
+        printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("OOPS! Current project version not supported!"));
+        printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("Found %#x but expected %#x"), read_flash (LCD_HEADER_VERSION_ADDR) & 0xff, LCD_VERSION_EXPECTED);
+    }
+    // Flash invalid, unspecified (=1)
+    else
+        printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("OOPS! Flash content not valid :-("));
+
+    // Draw all other Buttons
+	draw_button (ERASE_BUTTON_XPOS, ERASE_BUTTON_YPOS, BUTTON_WIDTH, "Erase Flash");
 	draw_button (MONITOR_BUTTON_XPOS, MONITOR_BUTTON_YPOS, BUTTON_WIDTH, "Monitor");
 	draw_button (DOWNLOAD_BUTTON_XPOS, DOWNLOAD_BUTTON_YPOS, BUTTON_WIDTH, "Download");
-	draw_button (EXIT_BUTTON_XPOS, EXIT_BUTTON_YPOS, BUTTON_WIDTH, "Exit");
+	draw_button (REBOOT_BUTTON_XPOS, REBOOT_BUTTON_YPOS, BUTTON_WIDTH, "Reboot");
+
 	system_page_active = SYSTEM_PAGE_MAIN;
 }
 
 
-char* get_download_files (uint8_t i) {
+static char* get_download_files (uint8_t i) {
 
 _LCD_FILE_NAMES_t *fname;
 
@@ -295,7 +323,7 @@ _LCD_FILE_NAMES_t *fname;
 }
 
 // Create Flash Erase control page (SH)
-void create_flash_control_page (void) {
+static void create_flash_control_page (void) {
 	uint8_t temp;
 
 	// clear page contents
@@ -342,7 +370,7 @@ void create_flash_control_page (void) {
 				read_flash_qfi_info(G_pri_address+FLASH_PRI_VER_MAJOR), read_flash_qfi_info(G_pri_address+FLASH_PRI_VER_MINOR),G_pri_address);
 	}
 	else
-		printf_tft_P(TFT_COLOR_RED, TFT_COLOR_BLUE, PSTR("Device doesn�t support QFI!"));
+		printf_tft_P(TFT_COLOR_RED, TFT_COLOR_BLUE, PSTR("Device doesn´t support QFI!"));
 
 #ifdef LCD_DEBUG
 	// Dump the QFI Area
@@ -372,7 +400,7 @@ void create_flash_control_page (void) {
 	system_page_active = SYSTEM_PAGE_FLASH_CONTROL;
 }
 
-void resume_busmon_page (void) {
+static void resume_busmon_page (void) {
 
 	// write header
 	showzifustr(75,1, (unsigned char*)"Busmon       ", TFT_COLOR_BLACK, TFT_COLOR_WHITE);
@@ -381,7 +409,7 @@ void resume_busmon_page (void) {
 	system_page_active = SYSTEM_PAGE_BUSMON;
 }
 
-void create_monitor_selection_page (void) {
+static void create_monitor_selection_page (void) {
 
 	// clear page contents
 	tft_clrscr(TFT_COLOR_WHITE);
@@ -397,7 +425,7 @@ void create_monitor_selection_page (void) {
 	system_page_active = SYSTEM_PAGE_MONITOR_SELECTION;
 }
 
-void create_hardware_monitor_page (void) {
+static void create_hardware_monitor_page (void) {
 
 	// clear page contents
 	tft_clrscr(TFT_COLOR_WHITE);
@@ -412,7 +440,7 @@ void create_hardware_monitor_page (void) {
 	system_page_active = SYSTEM_PAGE_HARDWARE_MONITOR;
 }
 
-void create_busmon_page (void) {
+static void create_busmon_page (void) {
 
 	// clear page contents
 	tft_clrscr(TFT_COLOR_WHITE);
@@ -426,7 +454,7 @@ void create_busmon_page (void) {
 	resume_busmon_page ();
 }
 
-void create_busmon_paused_page (void) {
+static void create_busmon_paused_page (void) {
 	// write header
 	showzifustr(75,1, (unsigned char*)"Busmon paused", TFT_COLOR_WHITE, TFT_COLOR_RED);
 
@@ -436,8 +464,7 @@ void create_busmon_paused_page (void) {
 }
 
 
-
-void create_download_selection_page (void) {
+static void create_download_selection_page (void) {
 
 	// set active system page
 	// needs to be done before! SD card check to avoid start of project on EXIT in case of an error
@@ -479,7 +506,7 @@ void create_download_selection_page (void) {
 	draw_button (EXIT_BUTTON_XPOS, EXIT_BUTTON_YPOS, BUTTON_WIDTH, "Exit");
 }
 
-void create_download_progress_page (void) {
+static void create_download_progress_page (void) {
 
 _LCD_FILE_NAMES_t *fname;
 uint8_t s;
@@ -518,7 +545,72 @@ uint8_t s;
 	system_page_active = SYSTEM_PAGE_DOWNLOAD_PROGRESS;
 }
 
-void process_system_page_event (t_touch_event *evt) {
+static void create_flash_erase_page (void) {
+	#ifdef HW_DEBUG
+	printf_P(PSTR("\nFLASH Erase started..."));
+	#endif
+	// Clear Screen
+	tft_fill_rect(TFT_COLOR_BLUE, START_CHAR_X_POS, 20, END_CHAR_X_POS, END_CHAR_Y_POS);
+	tft_set_cursor(15, 80);
+	printf_tft_P(TFT_COLOR_RED, TFT_COLOR_BLUE, PSTR("Erasing FLASH..."));
+	// Erase all blocks (128)
+	uint8_t success = erase_complete_flash(FLASH_MAX_SECTOR, 0);
+
+	tft_set_cursor(70, 145);
+	if (!success) {
+    	printf_tft_P( TFT_COLOR_RED, TFT_COLOR_GREEN, PSTR("Successfully erased Flash!"));
+	}
+	else {
+    	printf_tft_P( TFT_COLOR_RED, TFT_COLOR_BLACK, PSTR("Something went wrong!"));
+	}
+}
+
+static void create_flash_hex_dump (void) {
+    tft_fill_rect(TFT_COLOR_BLUE, START_CHAR_X_POS, 20, END_CHAR_X_POS, END_CHAR_Y_POS);
+    tft_set_cursor(START_CHAR_X_POS, 20);
+    // If Primary Extended Table exists plot some infos
+    if (G_pri_address) {
+        // PRI is around 0x10 long, depends on device
+        printf_tft_P(TFT_COLOR_YELLOW, TFT_COLOR_BLUE, PSTR("Found PRI table Version %c.%c at 0x%x"),
+        read_flash_qfi_info(G_pri_address+FLASH_PRI_VER_MAJOR), read_flash_qfi_info(G_pri_address+FLASH_PRI_VER_MINOR),G_pri_address);
+    }
+
+    // Print the HEX dump
+    printf_tft_P(TFT_COLOR_YELLOW, TFT_COLOR_BLUE, PSTR("QFI HEX Dump:"));
+    uint8_t i;	// address
+    uint8_t j;	// line count
+    for (i=0x10, j=0; i<0x60; i++) {
+        if (i%8 == 0) {
+            tft_set_cursor(START_CHAR_X_POS, 50+j*15);
+            printf_tft_append(TFT_COLOR_ORANGE, TFT_COLOR_BLUE, "%#2.2X|", i);
+            tft_set_cursor(35, 50+j*15);
+            j++;	// Next Line
+        }
+        printf_tft_append(TFT_COLOR_YELLOW, TFT_COLOR_BLUE, " %#2.2x", read_flash_qfi_info(i));
+    }
+    // Issue device reset command to leave QFI mode
+    reset_flash_chip();
+}
+
+static void create_reboot_confirm_page (void) {
+
+	// clear page contents
+	tft_clrscr(TFT_COLOR_YELLOW);
+
+	// write header
+    printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_YELLOW, PSTR("Reboot System"));
+    printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_YELLOW, PSTR("All object values will be cleared."));
+    printf_tft_P( TFT_COLOR_BLACK, TFT_COLOR_YELLOW, PSTR("Are you sure to reboot the system?"));
+
+	draw_button (REBOOT_CONFIRM_BUTTON_XPOS, REBOOT_CONFIRM_BUTTON_YPOS, BUTTON_WIDTH, "Reboot");
+    draw_button (LCD_ROTATE_BUTTON_XPOS, LCD_ROTATE_BUTTON_YPOS, BUTTON_WIDTH, "LCD Rotate");
+	draw_button (CANCEL_BUTTON_XPOS, CANCEL_BUTTON_YPOS, BUTTON_WIDTH, "Cancel");
+	// set active system page
+	system_page_active = SYSTEM_PAGE_REBOOT_CONFIRM;
+}
+
+
+static void process_system_page_event (t_touch_event *evt) {
 
 	if (evt->state == TOUCHED) {
 
@@ -527,7 +619,7 @@ void process_system_page_event (t_touch_event *evt) {
 			// check, if flash erase button is hit
 			if (check_button (ERASE_BUTTON_XPOS, ERASE_BUTTON_YPOS, BUTTON_WIDTH, evt)) {
 				sound_beep_on (0);
-				create_flash_control_page ();	// added by sh
+				create_flash_control_page ();
 			}
 			// check, if busmon button is hit
 			if (check_button (MONITOR_BUTTON_XPOS, MONITOR_BUTTON_YPOS, BUTTON_WIDTH, evt)) {
@@ -539,11 +631,19 @@ void process_system_page_event (t_touch_event *evt) {
 				sound_beep_on (0);
 				create_download_selection_page ();
 			}
+			// check, if reboot button is hit
+			if (check_button (REBOOT_BUTTON_XPOS, REBOOT_BUTTON_YPOS, BUTTON_WIDTH, evt)) {
+				sound_beep_on (0);
+				create_reboot_confirm_page ();
+			}
 			// check, if Exit button is hit
 			if (check_button (EXIT_BUTTON_XPOS, EXIT_BUTTON_YPOS, BUTTON_WIDTH, evt)) {
 				sound_beep_on (0);
-				system_page_active = SYSTEM_PAGE_NONE;
-				set_page (0);
+                // Stay on info screen if flash contend is not valid
+                if (!flash_content_bad) {
+				    system_page_active = SYSTEM_PAGE_NONE;
+				    set_page (0);
+                }
 			}
 		}
 		else if (system_page_active == SYSTEM_PAGE_DOWNLOAD_SELECTION) {
@@ -644,55 +744,32 @@ void process_system_page_event (t_touch_event *evt) {
 			// check, if Flash Erase button is hit
 			if (check_button (FLASH_ERASE_BUTTON_XPOS, FLASH_ERASE_BUTTON_YPOS, BUTTON_WIDTH, evt)) {
 				sound_beep_on (0);
-			#ifdef HW_DEBUG
-				printf_P(PSTR("\nFLASH Erase started..."));
-			#endif
-				// Clear Screen
-				tft_fill_rect(TFT_COLOR_BLUE, START_CHAR_X_POS, 20, END_CHAR_X_POS, END_CHAR_Y_POS);
-				tft_set_cursor(15, 80);
-				printf_tft_P(TFT_COLOR_RED, TFT_COLOR_BLUE, PSTR("Erasing FLASH..."));
-				// Erase all blocks (128)
-				uint8_t success = erase_complete_flash(FLASH_MAX_SECTOR, 0);
-
-				tft_set_cursor(70, 145);
-				if (!success) {
-					printf_tft_P( TFT_COLOR_RED, TFT_COLOR_GREEN, PSTR("Successfully erased Flash!"));
-				}
-				else {
-					printf_tft_P( TFT_COLOR_RED, TFT_COLOR_BLACK, PSTR("Something went wrong!"));
-				}
-			}
+                create_flash_erase_page();
+            }
 			// check, if QFI dump button is visible and hit
 			if (G_support_qfi && check_button (FLASH_INFO_BUTTON_XPOS, FLASH_INFO_BUTTON_YPOS, BUTTON_WIDTH, evt)) {
 				sound_beep_on (0);
-
-				tft_fill_rect(TFT_COLOR_BLUE, START_CHAR_X_POS, 20, END_CHAR_X_POS, END_CHAR_Y_POS);
-				tft_set_cursor(START_CHAR_X_POS, 20);
-				// If Primary Extended Table exists plot some infos
-				if (G_pri_address) {
-					// PRI is around 0x10 long, depends on device
-					printf_tft_P(TFT_COLOR_YELLOW, TFT_COLOR_BLUE, PSTR("Found PRI table Version %c.%c at 0x%x"),
-					read_flash_qfi_info(G_pri_address+FLASH_PRI_VER_MAJOR), read_flash_qfi_info(G_pri_address+FLASH_PRI_VER_MINOR),G_pri_address);
-				}
-
-				// Print the HEX dump
-				printf_tft_P(TFT_COLOR_YELLOW, TFT_COLOR_BLUE, PSTR("QFI HEX Dump:"));
-				uint8_t i;	// address
-				uint8_t j;	// line count
-				for (i=0x10, j=0; i<0x60; i++) {
-					if (i%8 == 0) {
-						tft_set_cursor(START_CHAR_X_POS, 50+j*15);
-						printf_tft_append(TFT_COLOR_ORANGE, TFT_COLOR_BLUE, "%#2.2X|", i);
-						tft_set_cursor(35, 50+j*15);
-						j++;	// Next Line
-					}
-					printf_tft_append(TFT_COLOR_YELLOW, TFT_COLOR_BLUE, " %#2.2x", read_flash_qfi_info(i));
-				}
-				// Issue device reset command to leave QFI mode
-				reset_flash_chip();
+                create_flash_hex_dump();
 			}
 			// check, if Exit button is hit
 			if (check_button (EXIT_BUTTON_XPOS, EXIT_BUTTON_YPOS, BUTTON_WIDTH, evt)) {
+				sound_beep_on (0);
+				create_system_info_screen ();
+			}
+		}
+		else if (system_page_active == SYSTEM_PAGE_REBOOT_CONFIRM) {
+
+			// Reboot confirmation
+			if (check_button (REBOOT_CONFIRM_BUTTON_XPOS, REBOOT_CONFIRM_BUTTON_YPOS, BUTTON_WIDTH, evt)) {
+				reboot();
+            }
+            // LCD 180° Rotation
+            if (check_button (LCD_ROTATE_BUTTON_XPOS, LCD_ROTATE_BUTTON_YPOS, BUTTON_WIDTH, evt)) {
+                drv_lcd_rotate(!lcd_rotation);  // Toggle rotation
+                create_reboot_confirm_page();   // Rewrite controller RAM need when changing RL Bit
+			}
+			// Cancel
+			if (check_button (CANCEL_BUTTON_XPOS, CANCEL_BUTTON_YPOS, BUTTON_WIDTH, evt)) {
 				sound_beep_on (0);
 				create_system_info_screen ();
 			}
@@ -764,7 +841,7 @@ void init_screen_control () {
 	system_page_active = SYSTEM_PAGE_NONE;
 }
 
-void hwmon_goto_next_line (void) {
+static void hwmon_goto_next_line (void) {
 
 	monitor_y += 10;
 	if (monitor_y > 190) {

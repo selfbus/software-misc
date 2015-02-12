@@ -32,9 +32,12 @@ uint8_t		element_type;
 #define	LISTEN_ELEMENT_TYPE_BACKLIGHT_ACTIVE	1
 #define LISTEN_ELEMENT_TYPE_LED					2
 #define	LISTEN_ELEMENT_TYPE_WARNING				3
+#define LISTEN_ELEMENT_TIMEOUT					4
 
 // divider for 30ms -> 120ms
 #define LISTEN_OBJECTS_TIMER_MAX				4
+// divider for 30ms -> 1.33sec
+#define LISTEN_OBJECTS_TIMER_1SEC				33
 
 // moves the page descriptions from Flash into RAM
 // returns 0 if ok

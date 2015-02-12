@@ -2,8 +2,8 @@
  *  \brief Constants and definitions for the control of cyclicly called objects
  *	This module is part of the EIB-LCD Controller Firmware
  *
- *	Copyright (c) 2011-2013 Arno Stock <arno.stock@yahoo.de>
- *  Copyright (c) 2013 Stefan Haller <stefanhaller.sverige@gmail.com>
+ *	Copyright (c) 2011-2015 Arno Stock <arno.stock@yahoo.de>
+ *  Copyright (c) 2014 Stefan Haller <stefanhaller.sverige@gmail.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License version 2 as
@@ -39,8 +39,10 @@ uint8_t move_cyclic_descriptions (uint32_t, uint32_t);
 // check objects on event
 void lcd_cyclic_process_event (void);
 
-// init hardware
+// init cyclic objects
 void lcd_init_cyclic_objects (void);
 
+// get timeout value of object
+uint16_t lcd_get_timeout_counter (uint8_t);
 
 #endif // _CYCLIC_H_

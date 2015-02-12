@@ -18,15 +18,19 @@ typedef struct __attribute__ ((packed)) {
 uint8_t		element_size;
 uint8_t		element_type;
 uint16_t	picture_index1;
+uint16_t	picture_timeout_index1;
 uint16_t	x_pos;
 uint16_t	y_pos;
 uint8_t		text_x;
 uint8_t		chars;
 uint8_t		eib_object_listen;
 // d1: 1=init
+// d7: 1=timeout was detected
 uint8_t		parameter;
+uint8_t		timeout_time;
 } _E_VALUE_t;
 #define VALUE_PARAMETER_INIT 0x02
+#define VALUE_PARAMETER_TIMEOUT_CONDITION	0x80
 
 #define MAX_VALUE_LENGTH 14
 
@@ -44,5 +48,8 @@ void draw_value_element (char*);
 
 // check for update from EIB
 void check_value_element (char*, int);
+
+// check for timeout condition
+void check_value_timeout (char*);
 
 #endif // _E_VALUE_H_

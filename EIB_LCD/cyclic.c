@@ -73,7 +73,7 @@ _CYCLIC_ELEMENT_t	*cyclic_element;
 uint8_t	element_count;
 int i;
 
-	if ((!flash_content_ok) || (!cyclic_descriptions_validated))
+	if ((flash_content_bad) || (!cyclic_descriptions_validated))
 		return;
 
 	// check RC5 reception
@@ -162,7 +162,7 @@ _CYCLIC_ELEMENT_t	*cyclic_element;
 uint8_t	element_count;
 int i;
 
-	if ((!flash_content_ok) || (!cyclic_descriptions_validated))
+	if ((flash_content_bad) || (!cyclic_descriptions_validated))
 		return;
 
 	// init RC5 timers

@@ -40,23 +40,41 @@ void ssd1963_43_1_address_set(unsigned int x1, unsigned int y1, unsigned int x2,
 }
 
 
+// Scales touch input, handles 180° rotation
 void ssd1963_43_1_convert_touch_coordinates (void) {
 
 	ly = (TP_Y - SSD1963_43_1_Y_OFFSET) / SSD1963_43_1_Y_OFFSET_FACT;
+    if (lcd_rotation)
+        ly = get_max_y() - ly;
 
 	lx = (TP_X - SSD1963_43_1_X_OFFSET) / SSD1963_43_1_X_OFFSET_FACT;
-	if (invert_touch_x)
+	if (lcd_rotation)
 		lx = get_max_x() - lx;
 
 	if (lx < 0)
 		lx = 0;
 }
 
+
+// Rotate by 180° via LCD controller
+// rotation != 0 --> 180°
+void ssd1963_43_1_rotate(uint8_t rotation)
+{
+    lcd_rotation = rotation;    // set global
+    tft_set_pointer(SSD1963_set_address_mode);	//rotation
+    if (rotation)
+    tft_write_byte(0x0000); // Upside down
+    else
+    tft_write_byte(0x0003); // Back to normal
+}
+
+
 void ssd1963_43_1_init() {
 
 	// set global information
 	drv_convert_touch_coordinates = ssd1963_43_1_convert_touch_coordinates;
 	drv_address_set = ssd1963_43_1_address_set;
+    drv_lcd_rotate = ssd1963_43_1_rotate;
 	// Return used resolution
 	screen_max_x = T4_HDP;	// X
 	screen_max_y = T4_VDP;	// Y
@@ -121,8 +139,8 @@ void ssd1963_43_1_init() {
 	tft_write_byte(0x0001);						//GPIO0 normal
 
 	tft_set_pointer(SSD1963_set_address_mode); //rotation
-	if (rotate) tft_write_byte(0x0003);
-	else tft_write_byte(0x0000);
+	tft_write_byte(0x0003);
+	//tft_write_byte(0x0000);
 
 	tft_set_pointer(SSD1963_set_pixel_data_interface); //pixel data interface
 	tft_write_byte(0x0003);

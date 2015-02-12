@@ -7,7 +7,7 @@
  *	- inform all "always listen" objects about a new EIB message
  *	- inform all "always listen" objects about a new cyclic timer event
  *
- *	Copyright (c) 2011-2013 Arno Stock <arno.stock@yahoo.de>
+ *	Copyright (c) 2011-2015 Arno Stock <arno.stock@yahoo.de>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License version 2 as
@@ -18,9 +18,11 @@
 #include "o_backlight.h"
 #include "o_led.h"
 #include "o_warning.h"
+#include "o_timeout.h"
 
 uint8_t listen_descriptions_validated;
 volatile uint8_t listen_objects_timer;
+volatile uint8_t listen_objects_timer_1s;
 volatile uint8_t listen_objects_timer_flags;
 
 // moves listening elements descriptions from Flash into RAM. Purpose is fast and easy access to Bytes.
@@ -65,7 +67,7 @@ uint8_t	element_count;
 int i;
 int	eib_object;
 
-	if (!flash_content_ok)
+	if (flash_content_bad)
 		return;
 
 	eib_object = get_group_adress_index (address);
@@ -85,7 +87,7 @@ int	eib_object;
 
 		// set page descriptions bank for safety
 		XRAM_SELECT_BLOCK(XRAM_LISTEN_ELEMENTS_PAGE);
-		
+
 		switch (listen_element->element_type) {
 			case LISTEN_ELEMENT_TYPE_BACKLIGHT_IDLE:
 			case LISTEN_ELEMENT_TYPE_BACKLIGHT_ACTIVE:
@@ -96,8 +98,11 @@ int	eib_object;
 			case LISTEN_ELEMENT_TYPE_WARNING:
 				check_warning_object (p, eib_object);
 			break;
+			case LISTEN_ELEMENT_TIMEOUT:
+				check_timeout_object (p, eib_object);
+			break;
 #ifdef LCD_DEBUG
-			default: printf_P (PSTR("unknown listen element %d\n"), listen_element->element_type);
+			default: printf_P (PSTR("%s():%d unknown listen element %d\n"), __FUNCTION__, __LINE__, listen_element->element_type);
 #endif
 		}
 
@@ -117,7 +122,7 @@ _LISTEN_ELEMENT_t	*listen_element;
 uint8_t	element_count;
 int i;
 
-	if (!flash_content_ok)
+	if (flash_content_bad)
 		return;
 
 	// poll all listen components and check, if they need hardware setup
@@ -133,7 +138,7 @@ int i;
 
 		// set page descriptions bank for safety
 		XRAM_SELECT_BLOCK(XRAM_LISTEN_ELEMENTS_PAGE);
-		
+
 		switch (listen_element->element_type) {
 
 			case LISTEN_ELEMENT_TYPE_BACKLIGHT_IDLE:
@@ -143,8 +148,14 @@ int i;
 			case LISTEN_ELEMENT_TYPE_LED:
 				init_led_object (p);
 			break;
+            case LISTEN_ELEMENT_TYPE_WARNING:
+            // nothing to do for TYPE_WARNING
+            break;
+			case LISTEN_ELEMENT_TIMEOUT:
+				init_timeout_object (p);
+			break;
 #ifdef LCD_DEBUG
-			default: printf_P (PSTR("unknown listen element %d\n"), listen_element->element_type);
+			default: printf_P (PSTR("%s():%d unknown listen element %d\n"), __FUNCTION__, __LINE__, listen_element->element_type);
 #endif
 		}
 
@@ -153,8 +164,52 @@ int i;
 	}
 
 	listen_objects_timer = 0;
+	listen_objects_timer_1s = 0;
 	listen_objects_timer_flags = 0;
 }
+
+
+// get timeout counter value
+uint16_t lcd_get_timeout_counter (uint8_t eib_object) {
+
+char* p;
+_LISTEN_ELEMENT_t	*listen_element;
+uint8_t	element_count;
+int i;
+uint16_t val = 0;
+
+	// poll all components of active page and check, if they match the eib address
+	// set page descriptions bank
+	XRAM_SELECT_BLOCK(XRAM_LISTEN_ELEMENTS_PAGE);
+	p = (char*)XRAM_BASE_ADDRESS;
+	element_count = ((_LISTEN_DESCRIPTOR_t*) p)->element_count;
+	p += sizeof (_LISTEN_DESCRIPTOR_t);
+
+	// iterate all listening elements
+	for (i = 0; i < element_count; i++) {
+		listen_element = (_LISTEN_ELEMENT_t*) p;
+
+		// set page descriptions bank for safety
+		XRAM_SELECT_BLOCK(XRAM_LISTEN_ELEMENTS_PAGE);
+
+		switch (listen_element->element_type) {
+			case LISTEN_ELEMENT_TYPE_BACKLIGHT_IDLE:
+			case LISTEN_ELEMENT_TYPE_BACKLIGHT_ACTIVE:
+			case LISTEN_ELEMENT_TYPE_LED:
+			break;
+			case LISTEN_ELEMENT_TIMEOUT:
+				if (get_timeout_object_counter (p, eib_object, &val))
+					return val;
+			break;
+		}
+
+		XRAM_SELECT_BLOCK(XRAM_LISTEN_ELEMENTS_PAGE);
+		p += listen_element->element_size;
+	}
+	// should never happen:
+	return 0xffff;
+}
+
 
 
 /**
@@ -168,13 +223,17 @@ _LISTEN_ELEMENT_t	*listen_element;
 uint8_t	element_count;
 int i;
 
-	if (!flash_content_ok)
+	if (flash_content_bad)
 		return;
 
 	if (++listen_objects_timer > LISTEN_OBJECTS_TIMER_MAX) {
 		listen_objects_timer = 0;
 		// calculate timer flags
 		listen_objects_timer_flags++;
+	}
+
+	if (++listen_objects_timer_1s > LISTEN_OBJECTS_TIMER_1SEC) {
+		listen_objects_timer_1s = 0;
 	}
 
 	// poll all components of active page and check, if they match the eib address
@@ -190,13 +249,17 @@ int i;
 
 		// set page descriptions bank for safety
 		XRAM_SELECT_BLOCK(XRAM_LISTEN_ELEMENTS_PAGE);
-		
+
 		switch (listen_element->element_type) {
 			case LISTEN_ELEMENT_TYPE_BACKLIGHT_IDLE:
 			case LISTEN_ELEMENT_TYPE_BACKLIGHT_ACTIVE:
 			break;
 			case LISTEN_ELEMENT_TYPE_LED:
 				check_led_object (p, listen_objects_timer_flags);
+			break;
+			case LISTEN_ELEMENT_TIMEOUT:
+				if (!listen_objects_timer_1s)
+					tick_timeout_object (p);
 			break;
 		}
 

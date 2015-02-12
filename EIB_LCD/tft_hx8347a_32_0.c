@@ -43,11 +43,20 @@ void hx8347a_32_0_convert_touch_coordinates (void) {
 
 }
 
+void hx8347a_32_0_rotate(uint8_t rotation)
+{
+    lcd_rotation = rotation;    // set global
+
+//FIXME: add code for display rotation here
+
+}
+
 void hx8347a_32_0_init() {
 
 	// set global information
 	drv_convert_touch_coordinates = hx8347a_32_0_convert_touch_coordinates;
 	drv_address_set = hx8347a_32_0_address_set;
+	drv_lcd_rotate = hx8347a_32_0_rotate;
 	// Return used resolution
 	screen_max_x = 319;	// X
 	screen_max_y = 239;	// Y

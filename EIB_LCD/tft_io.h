@@ -156,18 +156,18 @@ int	ly;
 *  ==============================================================================
 */
 
-extern volatile uint8_t controller_type; // 0=unknown, 1 = HX8347-A, 2=SSD1289, 3=ILI9325 2.4" 180� rotated
+extern volatile uint8_t controller_type;// 0=unknown, 1 = HX8347-A, 2=SSD1289, 3=ILI9325 2.4" 180° rotated
 extern volatile uint16_t controller_id; // R00 value
 extern volatile uint8_t lcd_type;		// Resistor coding used to distinguish between LCDs if controller type is same
 extern volatile uint8_t invert_touch_y; // invert X coordinate of touch position
 extern volatile uint8_t invert_touch_x; // invert Y coordinate of touch position
+extern volatile uint8_t lcd_rotation;   // hardware 180° rotation of LCD screen (needs support of LCD controller!)
 
 // global variables used by the TFT base driver
-extern volatile uint16_t screen_max_x; // max X coordinate of display
-extern volatile uint16_t screen_max_y; // max Y coordinate of display
-extern volatile int16_t lx, ly; // screen coordinates of touch event
-extern volatile int16_t TP_X, TP_Y;	// absolute coordinates of touch event
-extern volatile uint8_t rotate;     // rotates screen by 180° when true
+extern volatile uint16_t screen_max_x;  // max X coordinate of display
+extern volatile uint16_t screen_max_y;  // max Y coordinate of display
+extern volatile int16_t lx, ly;         // screen coordinates of touch event
+extern volatile int16_t TP_X, TP_Y;	    // absolute coordinates of touch event
 
 // this function handles the touch event for the TFT in use
 extern void (*drv_convert_touch_coordinates)(void);
@@ -201,6 +201,9 @@ void tft_set_pointer (uint8_t);
 * light = 1: on
 */
 void tft_backlight (uint8_t);
+
+// refresh backlight setting as dimming values are changed
+void refresh_backlight(void);
 
 /** sents the init sequence to the tft controller
 * already called by tft_init();

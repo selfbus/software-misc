@@ -30,7 +30,7 @@
 	0: Flash content is not yet checked, corrupted or has the wrong structure version
 	1: Flash content is checked and ok
 */
-uint8_t	flash_content_ok;
+uint8_t	flash_content_bad;
 
 /*!
 	Definition to obtain the version of the firmware image
@@ -49,7 +49,7 @@ const bootldrinfo_t bootlodrinfo __attribute__ ((section (".bootldrinfo"))) = {D
  */
 int main(void)
 {
-	/* reset some hardware configs to cope with Bootloader */
+    /* reset some hardware configs to cope with Bootloader */
 	init_hardware ();
 
 	/* init the status LED on the LCD controller board */
@@ -69,7 +69,7 @@ uint32_t baud = 115200;
     NutSleep(200);
     printf_P(PSTR("\n\nNut/OS %s "), NutVersionString());
 	printf_P(PSTR("\nFirmware V%d.%d"), pgm_read_byte_far((char*)&bootlodrinfo.app_version +1), pgm_read_byte_far((char*)&bootlodrinfo.app_version));
-	printf_P(PSTR("\nBuild %s with GCC %s"), __TIMESTAMP__, __VERSION__);
+	printf_P(PSTR("\nBuild %s %s with GCC %s"), __DATE__, __TIME__, __VERSION__);
 #endif
 	/* set external memory i/f timing */
 	XMCRB |= (1<<XMBK); // enable bus keepers

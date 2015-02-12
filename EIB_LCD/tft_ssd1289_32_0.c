@@ -7,6 +7,7 @@
  * Controller:	SSD1289
  * Size:		3.2"
  * Resolution:	320 x 240
+ * Color depth: 65k
  * Order codes:	200475566068
  *
  *	Copyright (c) 2011-2014 Arno Stock <arno.stock@yahoo.de>
@@ -36,8 +37,10 @@ void ssd1289_32_0_address_set(unsigned int x1, unsigned int y1, unsigned int x2,
 void ssd1289_32_0_convert_touch_coordinates (void) {
 
 	ly = (TP_Y - SSD1289_Y_OFFSET) / SSD1289_Y_OFFSET_FACT;
+    if (lcd_rotation)
+        ly = get_max_y() - ly;
 
-	if (invert_touch_x) {
+	if (lcd_rotation) {
 		if (TP_X >= 380) {
 			lx = (3910 - TP_X) / SSD1289_X_OFFSET_FACT;
 			if (lx < 0)
@@ -46,15 +49,21 @@ void ssd1289_32_0_convert_touch_coordinates (void) {
 			lx = (TP_X - 391) / SSD1289_X_OFFSET_FACT;
 
 	} else
-		lx = (TP_X - 350) / SSD1289_X_OFFSET_FACT;
+		lx = (TP_X - SSD1289_X_OFFSET) / SSD1289_X_OFFSET_FACT;
 
 }
 
 
+// Rotate by 180° via LCD controller
+// rotation != 0 --> 180°
 void ssd1963_32_0_rotate(uint8_t rotation)
 {
-    if (rotation) main_W_com_data(SSD1289_OUTCTRL, 0x693F);   // Upside down, RL=1
-    else main_W_com_data(SSD1289_OUTCTRL, 0x293F);          // Normal, RL=0    
+    lcd_rotation = rotation;    // set global
+    // Change of RL has no immediate effect when running via RAM (Dmode[1:0]=00)
+    if (rotation)
+        main_W_com_data(SSD1289_OUTCTRL, 0x6B3F);   // Upside down, RL=1, TB=1
+    else
+        main_W_com_data(SSD1289_OUTCTRL, 0x293F);   // Normal, RL=0, TB=0
 }
 
 
@@ -80,9 +89,7 @@ void ssd1289_32_0_init() {
 	NutDelay(2);
 	main_W_com_data(SSD1289_PWRCTRL5, 0x00B0);
 	NutDelay(2);
-    //if (rotate) main_W_com_data(SSD1289_OUTCTRL, 0x693F);   // Rotation, RL=1
-    //else
-    main_W_com_data(SSD1289_OUTCTRL, 0x293F);          // Normal, RL=0
+    main_W_com_data(SSD1289_OUTCTRL, 0x293F);   // Normal, RL=0, TB0
 	NutDelay(2); //320*240  0x6B3F
 	main_W_com_data(SSD1289_ACCTRL, 0x0600);
 	NutDelay(2);

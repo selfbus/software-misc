@@ -51,11 +51,20 @@ void ili9325_24_0_convert_touch_coordinates (void) {
 		lx = (TP_X - 350) / 11;
 }
 
+void ili9325_24_0_rotate(uint8_t rotation)
+{
+    lcd_rotation = rotation;    // set global
+
+//FIXME: add code for display rotation here
+
+}
+
 void ili9325_24_0_init() {
 
 	// set global information
 	drv_convert_touch_coordinates = ili9325_24_0_convert_touch_coordinates;
 	drv_address_set = ili9325_24_0_address_set;
+	drv_lcd_rotate = ili9325_24_0_rotate;
 	// Return used resolution
 	screen_max_x = 319;	// X
 	screen_max_y = 239;	// Y

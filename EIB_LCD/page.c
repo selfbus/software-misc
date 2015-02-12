@@ -97,7 +97,7 @@ _PAGE_ELEMENT_t		*page_element;
 uint8_t	element_count;
 int i;
 
-	if (!flash_content_ok)
+	if (flash_content_bad)
 		return;
 	// init counter for automatic page change
 	auto_jump_counter = 0;
@@ -168,7 +168,7 @@ _PAGE_ELEMENT_t		*page_element;
 uint8_t	element_count;
 int i;
 
-	if (!flash_content_ok) {
+	if (flash_content_bad) {
 		touch_function = NULL;
 		active_element = NULL;
 		active_element_state = 0;
@@ -267,7 +267,7 @@ uint8_t	element_count;
 int i;
 int	eib_object;
 
-	if (!flash_content_ok)
+	if (flash_content_bad)
 		return;
 
 	if (system_page_active || is_screen_locked() )
@@ -345,6 +345,9 @@ int i;
 	warning_state = (warning_state +1) & 0x01;
 	keep_warning_sound = 0; 
 
+	if (flash_content_bad)
+		return;
+
 	// poll all components of active page and check all jumpers and warning LED
 	p = get_page_descriptor (active_page);
 	page_table = (_PAGE_DESCRIPTOR_t*) p;
@@ -378,6 +381,8 @@ int i;
 				}
 			break;
 			case PAGE_ELEMENT_TYPE_VALUE:
+				check_value_timeout (p);
+			break;
 			case PAGE_ELEMENT_TYPE_SBUTTON:
 			break;
 #ifdef LCD_DEBUG

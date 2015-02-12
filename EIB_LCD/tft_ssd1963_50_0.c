@@ -43,12 +43,15 @@ void ssd1963_50_0_address_set(unsigned int x1, unsigned int y1, unsigned int x2,
 }
 
 
+// Scales touch input, handles 180° rotation
 void ssd1963_50_0_convert_touch_coordinates (void) {
 
-	ly= (TP_X - SSD1963_0_50_Y_OFFSET) / SSD1963_0_50_Y_OFFSET_FACT;
+	ly = (TP_X - SSD1963_0_50_Y_OFFSET) / SSD1963_0_50_Y_OFFSET_FACT;
+	if (lcd_rotation)
+	    ly = get_max_y() - ly;
 
-	lx= (TP_Y - SSD1963_0_50_X_OFFSET) / SSD1963_0_50_X_OFFSET_FACT;
-	if (!invert_touch_x)	// needs to be inversed somehow?? Shouldn't it be like type 2
+	lx = (TP_Y - SSD1963_0_50_X_OFFSET) / SSD1963_0_50_X_OFFSET_FACT;
+	if (!lcd_rotation)
 		lx = get_max_x() - lx;
 
 	if (lx < 0)
@@ -56,11 +59,16 @@ void ssd1963_50_0_convert_touch_coordinates (void) {
 }
 
 
+// Rotate by 180° via LCD controller
+// rotation != 0 --> 180°
 void ssd1963_50_0_rotate(uint8_t rotation)
 {
-    tft_set_pointer(SSD1963_set_address_mode);//rotation
-    if (rotation) tft_write_byte(0x0000);   // Upside down
-    else tft_write_byte(0x0003);            // Back to normal
+    lcd_rotation = rotation;    // set global
+    tft_set_pointer(SSD1963_set_address_mode);  //rotation
+    if (rotation)
+        tft_write_byte(0x0000); // Upside down, 180°
+    else
+        tft_write_byte(0x0003); // Back to normal, 0°
 }
 
 
@@ -73,7 +81,6 @@ void ssd1963_50_0_init() {
 	// Return used resolution
 	screen_max_x = T0_HDP;	// X
 	screen_max_y = T0_VDP;	// Y
-	//rotate = !rotate; // this display is 180� rotated
 
 	// enable wait
 	XMCRA |= (1<<SRW00) | (1<<SRW01);	// wait
@@ -136,14 +143,12 @@ void ssd1963_50_0_init() {
 	tft_write_byte(0x0001);					//GPIO0 normal
 
 	tft_set_pointer(SSD1963_set_address_mode);//rotation
-	//if (rotate)
     tft_write_byte(0x0003);
-	//else tft_write_byte(0x0000);
 
 	tft_set_pointer(SSD1963_set_pixel_data_interface);//pixel data interface
 	tft_write_byte(0x0003);
 
-	NutDelay(5);
+	NutDelay(10);
 
 	tft_set_pointer(SSD1963_set_display_on); //display on
 

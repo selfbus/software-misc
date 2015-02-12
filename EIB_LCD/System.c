@@ -5,7 +5,7 @@
  * This module is part of the EIB-LCD Controller Firmware
  *
  *	Copyright (c) 2011-2013 Arno Stock <arno.stock@yahoo.de>
- *	Copyright (c) 2013 Stefan Haller <stefanhaller.sverige@gmail.com>
+ *	Copyright (c) 2013-2014 Stefan Haller <stefanhaller.sverige@gmail.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License version 2 as
@@ -14,6 +14,7 @@
  */
 #include "System.h"
 #include "FATSingleOpt/dos.h"
+#include <avr/wdt.h>
 
 volatile uint8_t display_orientation;
 const uint8_t port_bit[7] = { 0x01, 0x02, 0x04, 0x10, 0x20, 0x40, 0x80 };
@@ -59,7 +60,7 @@ volatile uint8_t*	p;
 
 // invalidates contents of the Flash
 void set_flash_content_invalid() {
-	flash_content_ok = 0;
+	flash_content_bad = 1;
 }
 
 // init hardware to clear settings from bootloader or hardware usage of last LCD project
@@ -75,7 +76,7 @@ void init_hardware (void) {
 	SPSR = 0;
 
 	backlight_dimming = 25;
-	backlight_active = 127;
+	backlight_active = 200;     // Reduce startup current of SMPS
 
 }
 
@@ -96,29 +97,31 @@ void init_sd_card (void) {
 
 
 // evaluate flash contents and init system
-uint8_t	init_system_from_flash (void) {
+int8_t	init_system_from_flash (void) {
 
 uint8_t	toc_items;
 uint8_t tft_config;
 
 	// check Flash contents
-	flash_content_ok = 0;
+	flash_content_bad = 1;
 	toc_items = 0;
 
 	// check magic
 	if ((read_flash (LCD_HEADER_MAGIC_ADDR_0) != LCD_HEADER_MAGIC_0) ||
 		(read_flash (LCD_HEADER_MAGIC_ADDR_1) != LCD_HEADER_MAGIC_1) ||
 		(read_flash (LCD_HEADER_MAGIC_ADDR_2) != LCD_HEADER_MAGIC_2) ) {
-		printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("Magic failed: %x%x%x"), read_flash (LCD_HEADER_MAGIC_ADDR_0), read_flash (LCD_HEADER_MAGIC_ADDR_1),read_flash (LCD_HEADER_MAGIC_ADDR_2));
-		return -1;
-	// check version
-	} else if (( read_flash (LCD_HEADER_VERSION_ADDR) & 0xff) != LCD_VERSION_EXPECTED) {
-		printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("This project version is not supported by this"));
-		printf_tft_P( TFT_COLOR_RED, TFT_COLOR_WHITE, PSTR("firmware! Found %#X but expected %#X"), read_flash (LCD_HEADER_VERSION_ADDR) & 0xff, LCD_VERSION_EXPECTED);
+        flash_content_bad = 2;
 		return -2;
+    }
+	// check version
+	  else if (( read_flash (LCD_HEADER_VERSION_ADDR) & 0xff) != LCD_VERSION_EXPECTED) {
+        flash_content_bad = 3;
+		return -3;
+    }
 	// check TOC entries
-	} else {
-		// get TFT configuration from Flash: d7: invert x, d6: invert y, d3-2: Display Type, d1-0: display orientation
+	  else {
+		// get TFT configuration from Flash: d7: invert x, d6: invert y, d5: rotation
+        // d3-2: Display Type, d1-0: display orientation
 		// d3-2:	00: 320x240
 		//			01: 800x480
 		//			10:
@@ -129,10 +132,12 @@ uint8_t tft_config;
 		invert_touch_x = (tft_config & 0x80) > 0;
 		// invert Y coordinate of touch position
 		invert_touch_y = (tft_config & 0x40) > 0;
+        drv_lcd_rotate( ((tft_config & 0x20) > 0));
 
 		printf_tft_P( TFT_COLOR_WHITE, TFT_COLOR_BLACK, PSTR("Touch mirror (x/y): %d/%d"), invert_touch_x, invert_touch_y);
 
-		// get backlight dimming from Flash
+		// get backlight dimming from Flash (not used any more)
+        //read_flash ( LCD_HEADER_DIMMING) & 0xff
 		// copy TOC to xram
 		toc_items = read_flash (LCD_TOC_ADDR >> 1) & 0xff;
 		copy_Flash_to_XRAM (LCD_TOC_ADDR, XRAM_TOC_ADDR, TOC_HEADER_SIZE + toc_items*TOC_ITEMS_SIZE);
@@ -172,7 +177,7 @@ foffset = (toc->flash_position >> 1) & 0x7fff;
 					printf_tft_P( TFT_COLOR_WHITE, TFT_COLOR_BLACK, PSTR("move listen element description returned: %d"), move_listen_descriptions (toc->flash_position, toc->size));
 				break;
 				case 7:
-					// copy listen elements descriptions into RAM mirror
+					// copy cyclic elements descriptions into RAM mirror
 					printf_tft_P( TFT_COLOR_WHITE, TFT_COLOR_BLACK, PSTR("move cyclic element description returned: %d"), move_cyclic_descriptions (toc->flash_position, toc->size));
 				break;
 				default:
@@ -181,10 +186,12 @@ foffset = (toc->flash_position >> 1) & 0x7fff;
 			toc++;
 		}
 
-		flash_content_ok = 1;
+		// Flash content valid now
+        flash_content_bad = 0;
 		// set all EIB objects to 0
 		eib_object_init ();
 		// init hardware
+        // TODO: Do we need this here? Isn't this done by element init?
 		lcd_init_listen_objects ();
 		lcd_init_cyclic_objects ();
 	}
@@ -344,4 +351,18 @@ _LCD_FILE_NAMES_t *current_fname;
 	} while ((entries < MAX_FNAME_COUNT) && Findnext());
 
 	return entries;
+}
+
+/* reboot the system by WDT overflow */
+void reboot () {
+
+	// disable interrupts
+	NutEnterCritical ();
+
+	// start WDT
+	wdt_enable (WDTO_30MS);
+
+	// wait for reset
+	while (1);
+
 }
