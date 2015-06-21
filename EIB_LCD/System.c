@@ -76,7 +76,8 @@ void init_hardware (void) {
 	SPSR = 0;
 
 	backlight_dimming = 25;
-	backlight_active = 200;     // Reduce startup current of SMPS
+//	backlight_active = 200;     // Reduce startup current of SMPS
+backlight_active = 127;     // Reduce startup current of SMPS
 
 }
 
@@ -225,8 +226,14 @@ uint8_t check_lcd_type_code (void) {
 	uint8_t	tft_type = 0;
 	uint8_t n;
 	uint8_t d;
+	uint8_t _portg, _ddrg, _porta, _ddra;
 
 	NutEnterCritical();
+
+	_portg = PORTG;
+	_ddrg = DDRG;
+	_porta = PORTA;
+	_ddra = DDRA;
 
 	// disable external memory i/f
 	PORTG |= 0x03; //disable RDn, WRn
@@ -234,12 +241,13 @@ uint8_t check_lcd_type_code (void) {
 	DDRG |= 0x07; // set Rdn, WRn, ALE to output
 
 	MCUCR &= ~(1 << SRE);
+	XMCRB &= 0xff ^(1 << XMBK);	// disable buskeeper
 
 	// search for resistor (~10k)
 	for (n = 0; n < 7; n++) {
 
 		DDRA = (1 << n);
-		PORTA = ~(1 << n);
+		PORTA = 0xff ^ (1 << n);
 
 		// give time to settle
 		for (d = 0; d < 40; d++)
@@ -252,7 +260,13 @@ uint8_t check_lcd_type_code (void) {
 	}
 
 	// enable external memory i/f
+	PORTG = _portg;
+	DDRG = _ddrg;
+	PORTA = _porta;
+	DDRA = _ddra;
+
 	MCUCR |= (1 << SRE);
+	XMCRB |= (1 << XMBK);	// enable buskeeper
 
 	NutExitCritical();
 	return tft_type;

@@ -33,6 +33,7 @@ uint8_t		element_type;
 #define LISTEN_ELEMENT_TYPE_LED					2
 #define	LISTEN_ELEMENT_TYPE_WARNING				3
 #define LISTEN_ELEMENT_TIMEOUT					4
+#define LISTEN_ELEMENT_TRACE					5
 
 // divider for 30ms -> 120ms
 #define LISTEN_OBJECTS_TIMER_MAX				4

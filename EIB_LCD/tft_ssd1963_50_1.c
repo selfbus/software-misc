@@ -63,9 +63,9 @@ void ssd1963_50_1_rotate(uint8_t rotation)
     lcd_rotation = rotation;    // set global
     tft_set_pointer(SSD1963_set_address_mode);  //rotation
     if (rotation)
-    tft_write_byte(0x0000); // Upside down, 180°
+    	tft_write_byte(0x0000); // Upside down, 180°
     else
-    tft_write_byte(0x0003); // Back to normal, 0°
+    	tft_write_byte(0x0003); // Back to normal, 0°
 }
 
 

@@ -168,10 +168,10 @@ uint8_t main_com_read_data(uint8_t com1) {
  */
 void tft_init_sequence(void) {
 
+	controller_type = CTRL_UNKNOWN;
+
 	// Read resistor coding, if any
 	lcd_type = check_lcd_type_code ();
-
-	controller_type = CTRL_UNKNOWN;
 
 	while (controller_type == CTRL_UNKNOWN) {
 		tft_set_reset_inactive();
@@ -201,12 +201,12 @@ void tft_init_sequence(void) {
 			b2 = tft_read_byte();
 			b3 = tft_read_byte();
 			b4 = tft_read_byte();
-/*
+
 #ifdef LCD_DEBUG
 			printf_P(PSTR("\nSSD1963: %2.2x %2.2x %2.2x %2.2x %2.2x\n"), b0, b1, b2, b3, b4);
 			printf_P(PSTR("SSD1963: %2.2x %2.2x %2.2x %2.2x %2.2x\n"), SSD1963_SSL_H, SSD1963_SSL_L, SSD1963_PROD, SSD1963_REV, SSD1963_EXIT);
 #endif
-*/
+
 			if ((b0 == SSD1963_SSL_H) && (b1 == SSD1963_SSL_L)
 					&& (b2 == SSD1963_PROD) && (b3 == SSD1963_REV)
 					&& (b4 == SSD1963_EXIT)) {
@@ -225,6 +225,8 @@ void tft_init_sequence(void) {
 #ifdef LCD_DEBUG
 	printf_P(PSTR("\nController-ID= %u\n"), controller_type);
 #endif
+
+//controller_type = CTRL_SSD1963;
 
 	if (controller_type == CTRL_HX8347) {
 		hx8347a_32_0_init();
